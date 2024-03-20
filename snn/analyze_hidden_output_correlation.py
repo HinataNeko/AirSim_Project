@@ -215,28 +215,28 @@ plt.show()
 #  v2[74]--throttle--负相关
 
 # 播放视频
-# cv2.destroyAllWindows()
-# idx = 0
-# while 0 <= idx < len(all_input):
-#     frame = np.transpose(all_input[idx], (1, 2, 0))
-#
-#     # 上采样（放大2倍），使用线性插值
-#     height, width = frame.shape[:2]
-#     frame_resized = cv2.resize(frame, (2 * width, 2 * height))
-#     frame_resized = cv2.cvtColor(frame_resized, cv2.COLOR_RGB2BGR)
-#
-#     # 将帧号作为文本添加到图像
-#     cv2.putText(frame_resized, f'Frame: {idx}', (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-#     cv2.imshow('Video', frame_resized)
-#
-#     key = cv2.waitKey(0)
-#
-#     if key == 32:  # 空格键播放
-#         idx += 1
-#     elif key in [98, 66]:  # "B" 或 "b" 键回退
-#         idx = max(0, idx - 1)  # 防止索引小于0
-#
-# cv2.destroyAllWindows()
+cv2.destroyAllWindows()
+idx = 0
+while 0 <= idx < len(all_input):
+    frame = np.transpose(all_input[idx], (1, 2, 0))
+
+    # 上采样（放大2倍），使用线性插值
+    height, width = frame.shape[:2]
+    frame_resized = cv2.resize(frame, (2 * width, 2 * height))
+    frame_resized = cv2.cvtColor(frame_resized, cv2.COLOR_RGB2BGR)
+
+    # 将帧号作为文本添加到图像
+    cv2.putText(frame_resized, f'Frame: {idx}', (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+    cv2.imshow('Video', frame_resized)
+
+    key = cv2.waitKey(0)
+
+    if key == 32:  # 空格键播放
+        idx += 1
+    elif key in [98, 66]:  # "B" 或 "b" 键回退
+        idx = max(0, idx - 1)  # 防止索引小于0
+
+cv2.destroyAllWindows()
 
 T = 8
 t = np.arange(0, T)
