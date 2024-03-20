@@ -243,41 +243,72 @@ plt.show()
 T = 8
 t = np.arange(0, T)
 v_threshold = None
+labels = ['roll', 'pitch', 'throttle', 'yaw']  # 定义y轴的标签
 
 images_index = [0, 112, 1127, 2204, 2352, 3492, 4574]
-grid_size = (len(images_index), 9)
+grid_size = (len(images_index), 11)
 
 plt.figure(figsize=(16, 9))
+font_size = 10
 
 for i in range(len(images_index)):
+    c = 0
     img = all_input[images_index[i]].transpose(1, 2, 0)
-    ax0 = plt.subplot2grid(grid_size, (i, 0))
-    ax0.imshow(img)
-    ax0.axis('off')  # 隐藏坐标轴
+    ax_img = plt.subplot2grid(grid_size, (i, c), colspan=2)
+    ax_img.imshow(img)
+    ax_img.axis('off')  # 隐藏坐标轴
+    ax_img.set_title(f'Input Image', fontsize=font_size)  # 为图片设置标题
+    c += 2
 
-    ax0 = plt.subplot2grid(grid_size, (i, 1), colspan=2)
+    ax_heatmap = plt.subplot2grid(grid_size, (i, c))
+    sns.heatmap(all_output[images_index[i]].reshape(-1, 1), annot=True, fmt=".3f", cmap='coolwarm', center=0, vmin=-1,
+                vmax=1,
+                ax=ax_heatmap)
+    ax_heatmap.set_xticks([])  # 隐藏横坐标
+    ax_heatmap.set_yticks(ticks=np.arange(len(labels)) + 0.5)
+    ax_heatmap.set_yticklabels(labels, rotation=0)
+    ax_heatmap.set_title('Output Heatmap', fontsize=font_size)
+    c += 1
+
+    ax0 = plt.subplot2grid(grid_size, (i, c), colspan=2)
     ax0.plot(t, all_T_v2[:, images_index[i], 0])
     ax0.set_xlim(-0.5, T - 0.5)
+    ax0.set_xticks(range(T))  # 设置横轴刻度位置
+    ax0.set_xticklabels(range(T))  # 设置横轴刻度标签
+    ax0.text(1.05, -0.15, 't', va='center', ha='left', transform=ax0.transAxes, fontsize=font_size)  # 设置横轴标题位置为横轴的右侧
+    ax0.text(-0.1, 1.05, 'v', va='bottom', ha='center', transform=ax0.transAxes, fontsize=font_size)
     if v_threshold:
         ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
+    if i == 0:
+        ax0.set_title("Neuron 0 (Yaw Positive Correlation)", fontsize=font_size)
+    c += 2
 
-    ax0 = plt.subplot2grid(grid_size, (i, 3), colspan=2)
+    ax0 = plt.subplot2grid(grid_size, (i, c), colspan=2)
     ax0.plot(t, all_T_v2[:, images_index[i], 2])
     ax0.set_xlim(-0.5, T - 0.5)
     if v_threshold:
         ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
+    if i == 0:
+        ax0.set_title("Neuron 2 (Yaw Negative Correlation)", fontsize=font_size)
+    c += 2
 
-    ax0 = plt.subplot2grid(grid_size, (i, 5), colspan=2)
+    ax0 = plt.subplot2grid(grid_size, (i, c), colspan=2)
     ax0.plot(t, all_T_v2[:, images_index[i], 15])
     ax0.set_xlim(-0.5, T - 0.5)
     if v_threshold:
         ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
+    if i == 0:
+        ax0.set_title("Neuron 15 (Throttle Positive Correlation)", fontsize=font_size)
+    c += 2
 
-    ax0 = plt.subplot2grid(grid_size, (i, 7), colspan=2)
+    ax0 = plt.subplot2grid(grid_size, (i, c), colspan=2)
     ax0.plot(t, all_T_v2[:, images_index[i], 74])
     ax0.set_xlim(-0.5, T - 0.5)
     if v_threshold:
         ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
+    if i == 0:
+        ax0.set_title("Neuron 74 (Throttle Negative Correlation)", fontsize=font_size)
+    c += 2
 
 plt.tight_layout()
 plt.show()
