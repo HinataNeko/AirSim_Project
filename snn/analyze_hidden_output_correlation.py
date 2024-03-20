@@ -215,34 +215,36 @@ plt.show()
 #  v2[74]--throttle--负相关
 
 # 播放视频
-cv2.destroyAllWindows()
-idx = 0
-while 0 <= idx < len(all_input):
-    frame = np.transpose(all_input[idx], (1, 2, 0))
-
-    # 上采样（放大2倍），使用线性插值
-    height, width = frame.shape[:2]
-    frame_resized = cv2.resize(frame, (2 * width, 2 * height))
-    frame_resized = cv2.cvtColor(frame_resized, cv2.COLOR_RGB2BGR)
-
-    # 将帧号作为文本添加到图像
-    cv2.putText(frame_resized, f'Frame: {idx}', (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-    cv2.imshow('Video', frame_resized)
-
-    key = cv2.waitKey(0)
-
-    if key == 32:  # 空格键播放
-        idx += 1
-    elif key in [98, 66]:  # "B" 或 "b" 键回退
-        idx = max(0, idx - 1)  # 防止索引小于0
-
-cv2.destroyAllWindows()
+# cv2.destroyAllWindows()
+# idx = 0
+# while 0 <= idx < len(all_input):
+#     frame = np.transpose(all_input[idx], (1, 2, 0))
+#
+#     # 上采样（放大2倍），使用线性插值
+#     height, width = frame.shape[:2]
+#     frame_resized = cv2.resize(frame, (2 * width, 2 * height))
+#     frame_resized = cv2.cvtColor(frame_resized, cv2.COLOR_RGB2BGR)
+#
+#     # 将帧号作为文本添加到图像
+#     cv2.putText(frame_resized, f'Frame: {idx}', (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+#     cv2.imshow('Video', frame_resized)
+#
+#     key = cv2.waitKey(0)
+#
+#     if key == 32:  # 空格键播放
+#         idx += 1
+#     elif key == 110:  # N键跳10帧
+#         idx += 10
+#     elif key in [98, 66]:  # "B" 或 "b" 键回退
+#         idx = max(0, idx - 1)  # 防止索引小于0
+#
+# cv2.destroyAllWindows()
 
 T = 8
 t = np.arange(0, T)
-v_threshold = 1.
+v_threshold = None
 
-images_index = [0, 112, 300, 1000, 1100]
+images_index = [0, 112, 1127, 2204, 2352, 3492, 4574]
 grid_size = (len(images_index), 9)
 
 plt.figure(figsize=(16, 9))
@@ -256,22 +258,26 @@ for i in range(len(images_index)):
     ax0 = plt.subplot2grid(grid_size, (i, 1), colspan=2)
     ax0.plot(t, all_T_v2[:, images_index[i], 0])
     ax0.set_xlim(-0.5, T - 0.5)
-    ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
+    if v_threshold:
+        ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
 
     ax0 = plt.subplot2grid(grid_size, (i, 3), colspan=2)
     ax0.plot(t, all_T_v2[:, images_index[i], 2])
     ax0.set_xlim(-0.5, T - 0.5)
-    ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
+    if v_threshold:
+        ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
 
     ax0 = plt.subplot2grid(grid_size, (i, 5), colspan=2)
     ax0.plot(t, all_T_v2[:, images_index[i], 15])
     ax0.set_xlim(-0.5, T - 0.5)
-    ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
+    if v_threshold:
+        ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
 
     ax0 = plt.subplot2grid(grid_size, (i, 7), colspan=2)
     ax0.plot(t, all_T_v2[:, images_index[i], 74])
     ax0.set_xlim(-0.5, T - 0.5)
-    ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
+    if v_threshold:
+        ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
 
 plt.tight_layout()
 plt.show()
