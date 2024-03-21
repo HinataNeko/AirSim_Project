@@ -259,96 +259,181 @@ def play_dataset_as_video():
     cv2.destroyAllWindows()
 
 
-T = 8
-t = np.arange(0, T)
-v_threshold = None
-labels = ['roll', 'pitch', 'throttle', 'yaw']  # 定义y轴的标签
+def show_neuron_layer2_activity():
+    T = 8
+    t = np.arange(0, T)
+    v_threshold = None
+    labels = ['roll', 'pitch', 'throttle', 'yaw']  # 定义y轴的标签
 
-# images_index = [0, 112, 1127, 2204, 2352, 3492, 4574]
-images_index = [3492, 4574, 2352, 180, 1127]
-grid_size = (len(images_index), 11)
-colors = [['red', 'blue', 'red', 'blue'],
-          ['red', 'blue', 'blue', 'red'],
-          ['blue', 'red', 'blue', 'red'],
-          ['blue', 'red', 'red', 'blue'],
-          ['red', 'blue', 'red', 'blue']]
-plt.figure(figsize=(16, 9))
-font_size = 10
-title_pad = 12
+    # images_index = [0, 112, 1127, 2204, 2352, 3492, 4574]
+    images_index = [3492, 4574, 2352, 180, 1127]
+    grid_size = (len(images_index), 11)
+    colors = [['red', 'blue', 'red', 'blue'],
+              ['red', 'blue', 'blue', 'red'],
+              ['blue', 'red', 'blue', 'red'],
+              ['blue', 'red', 'red', 'blue'],
+              ['red', 'blue', 'red', 'blue']]
+    plt.figure(figsize=(16, 9))
+    font_size = 10
+    title_pad = 12
 
-for i in range(len(images_index)):
+    for i in range(len(images_index)):
+        c = 0
+        img = all_input[images_index[i]].transpose(1, 2, 0)
+        ax_img = plt.subplot2grid(grid_size, (i, c), colspan=2)
+        ax_img.imshow(img)
+        ax_img.axis('off')  # 隐藏坐标轴
+        if i == 0:
+            ax_img.set_title(f'Input Image', fontsize=font_size, pad=title_pad)  # 为图片设置标题
+        c += 2
+
+        ax_heatmap = plt.subplot2grid(grid_size, (i, c))
+        sns_heatmap = sns.heatmap(all_output[images_index[i]].reshape(-1, 1), annot=True, fmt=".3f", cmap='coolwarm',
+                                  center=0, vmin=-1, vmax=1, ax=ax_heatmap)
+        cbar = sns_heatmap.collections[0].colorbar  # 获取热图的颜色条对象
+        cbar.set_ticks([-1, 0, 1])  # 设置颜色条的刻度为[-1, 0, 1]
+        ax_heatmap.set_xticks([])  # 隐藏横坐标
+        ax_heatmap.set_yticks(ticks=np.arange(len(labels)) + 0.5)
+        ax_heatmap.set_yticklabels(labels, rotation=0)
+        if i == 0:
+            ax_heatmap.set_title('Output Heatmap', fontsize=font_size, pad=title_pad)
+        c += 1
+
+        ax0 = plt.subplot2grid(grid_size, (i, c), colspan=2)
+        ax0.plot(t, all_T_v2[:, images_index[i], 0], color=colors[i][0])
+        ax0.set_xlim(-0.5, T - 0.5)
+        ax0.set_xticks(range(T))  # 设置横轴刻度位置
+        # ax0.set_xticklabels(range(T))  # 设置横轴刻度标签
+        ax0.text(1.04, -0.12, 't', va='center', ha='center', transform=ax0.transAxes,
+                 fontsize=font_size)  # 设置横轴标题位置为横轴的右侧
+        ax0.text(-0.05, 1.05, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
+        if v_threshold:
+            ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
+        if i == 0:
+            ax0.set_title(r"Neuron 0 ($\bf{Yaw\ Positive}$ Correlation)", fontsize=font_size, pad=title_pad)
+        c += 2
+
+        ax0 = plt.subplot2grid(grid_size, (i, c), colspan=2)
+        ax0.plot(t, all_T_v2[:, images_index[i], 2], color=colors[i][1])
+        ax0.set_xlim(-0.5, T - 0.5)
+        ax0.set_xticks(range(T))  # 设置横轴刻度位置
+        ax0.text(1.04, -0.12, 't', va='center', ha='center', transform=ax0.transAxes,
+                 fontsize=font_size)  # 设置横轴标题位置为横轴的右侧
+        ax0.text(-0.05, 1.05, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
+        if v_threshold:
+            ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
+        if i == 0:
+            ax0.set_title(r"Neuron 2 ($\bf{Yaw\ Negative}$ Correlation)", fontsize=font_size, pad=title_pad)
+        c += 2
+
+        ax0 = plt.subplot2grid(grid_size, (i, c), colspan=2)
+        ax0.plot(t, all_T_v2[:, images_index[i], 15], color=colors[i][2])
+        ax0.set_xlim(-0.5, T - 0.5)
+        ax0.set_xticks(range(T))  # 设置横轴刻度位置
+        ax0.text(1.04, -0.12, 't', va='center', ha='center', transform=ax0.transAxes,
+                 fontsize=font_size)  # 设置横轴标题位置为横轴的右侧
+        ax0.text(-0.05, 1.05, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
+        if v_threshold:
+            ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
+        if i == 0:
+            ax0.set_title(r"Neuron 15 ($\bf{Throttle\ Positive}$ Correlation)", fontsize=font_size, pad=title_pad)
+        c += 2
+
+        ax0 = plt.subplot2grid(grid_size, (i, c), colspan=2)
+        ax0.plot(t, all_T_v2[:, images_index[i], 74], color=colors[i][3])
+        ax0.set_xlim(-0.5, T - 0.5)
+        ax0.set_xticks(range(T))  # 设置横轴刻度位置
+        ax0.text(1.04, -0.12, 't', va='center', ha='center', transform=ax0.transAxes,
+                 fontsize=font_size)  # 设置横轴标题位置为横轴的右侧
+        ax0.text(-0.05, 1.05, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
+        if v_threshold:
+            ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
+        if i == 0:
+            ax0.set_title(r"Neuron 74 ($\bf{Throttle\ Negative}$ Correlation)", fontsize=font_size, pad=title_pad)
+        c += 2
+
+    plt.tight_layout()
+    plt.show()
+
+
+def show_neuron_layer1_activity():
+    T = 8
+    H = 128
+    labels = ['roll', 'pitch', 'throttle', 'yaw']  # 定义y轴的标签
+
+    start_frame = 2781
+    interval = 5
+    images_index = [start_frame + i * interval for i in range(5)]
+    grid_size = (7, len(images_index))
+
+    plt.figure(figsize=(16, 9))
+    font_size = 10
+    title_pad = 12
+
+    # 图像
+    r = 0
     c = 0
-    img = all_input[images_index[i]].transpose(1, 2, 0)
-    ax_img = plt.subplot2grid(grid_size, (i, c), colspan=2)
-    ax_img.imshow(img)
-    ax_img.axis('off')  # 隐藏坐标轴
-    if i == 0:
-        ax_img.set_title(f'Input Image', fontsize=font_size, pad=title_pad)  # 为图片设置标题
-    c += 2
+    for i in range(len(images_index)):
+        img = all_input[images_index[i]].transpose(1, 2, 0)
+        ax_img = plt.subplot2grid(grid_size, (r, c), rowspan=2, colspan=1)
+        ax_img.imshow(img)
+        ax_img.axis('off')  # 隐藏坐标轴
+        c += 1
+    r += 2
 
-    ax_heatmap = plt.subplot2grid(grid_size, (i, c))
-    sns_heatmap = sns.heatmap(all_output[images_index[i]].reshape(-1, 1), annot=True, fmt=".3f", cmap='coolwarm',
-                              center=0, vmin=-1, vmax=1, ax=ax_heatmap)
-    cbar = sns_heatmap.collections[0].colorbar  # 获取热图的颜色条对象
-    cbar.set_ticks([-1, 0, 1])  # 设置颜色条的刻度为[-1, 0, 1]
-    ax_heatmap.set_xticks([])  # 隐藏横坐标
-    ax_heatmap.set_yticks(ticks=np.arange(len(labels)) + 0.5)
-    ax_heatmap.set_yticklabels(labels, rotation=0)
-    if i == 0:
-        ax_heatmap.set_title('Output Heatmap', fontsize=font_size, pad=title_pad)
-    c += 1
+    # 放电栅格图，all_T_spikes1: (T, N, hidden)
+    c = 0
+    for i in range(len(images_index)):
+        ax_spike = plt.subplot2grid(grid_size, (r, c), rowspan=2, colspan=1)
 
-    ax0 = plt.subplot2grid(grid_size, (i, c), colspan=2)
-    ax0.plot(t, all_T_v2[:, images_index[i], 0], color=colors[i][0])
-    ax0.set_xlim(-0.5, T - 0.5)
-    ax0.set_xticks(range(T))  # 设置横轴刻度位置
-    # ax0.set_xticklabels(range(T))  # 设置横轴刻度标签
-    ax0.text(1.04, -0.12, 't', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)  # 设置横轴标题位置为横轴的右侧
-    ax0.text(-0.05, 1.05, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
-    if v_threshold:
-        ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
-    if i == 0:
-        ax0.set_title(r"Neuron 0 ($\bf{Yaw\ Positive}$ Correlation)", fontsize=font_size, pad=title_pad)
-    c += 2
+        # Plotting the raster plot in the specified subplot
+        t_indices, neuron_indices = np.where(all_T_spikes1[:, images_index[i]] == 1)
+        ax_spike.scatter(t_indices, H - 1 - neuron_indices, marker='.', color='blue')
+        # ax_spike.set_title('Raster Plot of Spikes')
+        ax_spike.set_xlabel('Time Step')
+        ax_spike.set_ylabel('Neuron')
+        ax_spike.set_xticks(range(T))
+        ax_spike.set_yticks(range(H - 1, -1, -H // 16))
+        ax_spike.set_yticklabels(range(0, H, H // 16))
+        ax_spike.set_ylim(-2, H + 1)
+        ax_spike.grid(True, which='both', linestyle='--', linewidth=0.5)
+        c += 1
+    r += 2
 
-    ax0 = plt.subplot2grid(grid_size, (i, c), colspan=2)
-    ax0.plot(t, all_T_v2[:, images_index[i], 2], color=colors[i][1])
-    ax0.set_xlim(-0.5, T - 0.5)
-    ax0.set_xticks(range(T))  # 设置横轴刻度位置
-    ax0.text(1.04, -0.12, 't', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)  # 设置横轴标题位置为横轴的右侧
-    ax0.text(-0.05, 1.05, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
-    if v_threshold:
-        ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
-    if i == 0:
-        ax0.set_title(r"Neuron 2 ($\bf{Yaw\ Negative}$ Correlation)", fontsize=font_size, pad=title_pad)
-    c += 2
+    # 脉冲发放率
+    c = 0
+    for i in range(len(images_index)):
+        ax_heatmap = plt.subplot2grid(grid_size, (r, c), rowspan=2, colspan=1)
+        firing_rates = np.mean(all_T_spikes1[:, images_index[i]], axis=0)
+        sns_heatmap = sns.heatmap(firing_rates.reshape(-1, 1), annot=False, fmt=".3f", cmap='coolwarm',
+                                  center=0.5, vmin=0, vmax=1, ax=ax_heatmap)
+        cbar = sns_heatmap.collections[0].colorbar  # 获取热图的颜色条对象
+        cbar.set_ticks([0, 0.5, 1])  # 设置颜色条的刻度
+        ax_heatmap.set_xticks([])  # 隐藏横坐标
+        ax_heatmap.set_ylabel('Neuron')
+        c += 1
+    r += 2
 
-    ax0 = plt.subplot2grid(grid_size, (i, c), colspan=2)
-    ax0.plot(t, all_T_v2[:, images_index[i], 15], color=colors[i][2])
-    ax0.set_xlim(-0.5, T - 0.5)
-    ax0.set_xticks(range(T))  # 设置横轴刻度位置
-    ax0.text(1.04, -0.12, 't', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)  # 设置横轴标题位置为横轴的右侧
-    ax0.text(-0.05, 1.05, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
-    if v_threshold:
-        ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
-    if i == 0:
-        ax0.set_title(r"Neuron 15 ($\bf{Throttle\ Positive}$ Correlation)", fontsize=font_size, pad=title_pad)
-    c += 2
+    # 输出动作
+    c = 0
+    for i in range(len(images_index)):
+        ax_heatmap = plt.subplot2grid(grid_size, (r, c))
+        sns_heatmap = sns.heatmap(all_output[images_index[i]].reshape(-1, 1), annot=True, fmt=".3f", cmap='coolwarm',
+                                  center=0, vmin=-1, vmax=1, ax=ax_heatmap)
+        cbar = sns_heatmap.collections[0].colorbar  # 获取热图的颜色条对象
+        cbar.set_ticks([-1, 0, 1])  # 设置颜色条的刻度为[-1, 0, 1]
+        ax_heatmap.set_xticks([])  # 隐藏横坐标
+        ax_heatmap.set_yticks(ticks=np.arange(len(labels)) + 0.5)
+        ax_heatmap.set_yticklabels(labels, rotation=0)
+        c += 1
+    r += 1
 
-    ax0 = plt.subplot2grid(grid_size, (i, c), colspan=2)
-    ax0.plot(t, all_T_v2[:, images_index[i], 74], color=colors[i][3])
-    ax0.set_xlim(-0.5, T - 0.5)
-    ax0.set_xticks(range(T))  # 设置横轴刻度位置
-    ax0.text(1.04, -0.12, 't', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)  # 设置横轴标题位置为横轴的右侧
-    ax0.text(-0.05, 1.05, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
-    if v_threshold:
-        ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
-    if i == 0:
-        ax0.set_title(r"Neuron 74 ($\bf{Throttle\ Negative}$ Correlation)", fontsize=font_size, pad=title_pad)
-    c += 2
+    plt.tight_layout()
+    plt.show()
 
-plt.tight_layout()
-plt.show()
+
+# play_dataset_as_video()
+show_neuron_layer1_activity()
 exit()
 
 images_index = [3492, 4574, 2352, 180, 1127]
