@@ -220,6 +220,7 @@ def show_corr_matrix_after_pca():
 # all_T_spikes1: (T, N, hidden)
 # all_T_v1: (T, N, hidden)
 # all_T_v2: (T, N, hidden)
+# all_v_last2: (N, hidden)
 
 #  sr1[3]--yaw--正相关
 #  sr1[2]--yaw--负相关
@@ -365,7 +366,7 @@ def show_neuron_layer1_activity():
     # interval = 5
     # images_index = [start_frame + i * interval for i in range(7)]
     images_index = [3680, 3686, 3694, 3710, 3718, 3725]
-    rowspan_list = [2, 3, 3, 1]  # 每一行子图的行数
+    rowspan_list = [3, 5, 5, 2]  # 每一行子图的行数
     grid_size = (sum(rowspan_list), len(images_index))
 
     plt.figure(figsize=(16, 9))
@@ -382,7 +383,7 @@ def show_neuron_layer1_activity():
         ax_img.axis('off')  # 隐藏坐标轴
         c += 1
         if i == 0:
-            ax_img.text(-0.4, 0.5, r'$\bf{Input\ Images}$', transform=ax_img.transAxes,
+            ax_img.text(-0.5, 0.5, r'$\bf{Input\ Images}$', transform=ax_img.transAxes,
                         ha='right', va='center', fontsize=font_size)
     r += rowspan_list[0]
 
@@ -417,6 +418,8 @@ def show_neuron_layer1_activity():
         cbar = sns_heatmap.collections[0].colorbar  # 获取热图的颜色条对象
         cbar.set_ticks([0, 0.5, 1])  # 设置颜色条的刻度
         ax_heatmap.set_xticks([])  # 隐藏横坐标
+        ax_heatmap.set_yticks(range(0, H, H // 16))
+        ax_heatmap.set_yticklabels(range(0, H, H // 16))
         ax_heatmap.set_ylabel('Neuron')
         c += 1
         if i == 0:
@@ -437,7 +440,7 @@ def show_neuron_layer1_activity():
         ax_heatmap.set_yticklabels(labels, rotation=0)
         c += 1
         if i == 0:
-            ax_heatmap.text(-0.5, 0.5, r'$\bf{Output\ Actions}$', transform=ax_heatmap.transAxes,
+            ax_heatmap.text(-0.5, 0.5, r'$\bf{Outputs}$', transform=ax_heatmap.transAxes,
                             ha='right', va='center', fontsize=font_size)
     r += rowspan_list[3]
 
@@ -445,8 +448,29 @@ def show_neuron_layer1_activity():
     plt.show()
 
 
+def show_relation_scatter():
+    labels = ['roll', 'pitch', 'throttle', 'yaw']
+    neuron_index = [0, 114, 15, 0]  # 指定的神经元索引
+
+    # 绘图
+    fig, axs = plt.subplots(2, 2, figsize=(16, 9))  # 创建2行2列的子图
+
+    for i in range(4):  # 遍历每个输出动作
+        row = i // 2  # 计算当前子图的行索引
+        col = i % 2   # 计算当前子图的列索引
+        axs[row, col].scatter(all_output[:, i], all_v_last2[:, neuron_index[i]], alpha=0.5)  # 绘制散点图
+        axs[row, col].set_title(f'{labels[i]} - Neuron {neuron_index[i]}')
+        axs[row, col].set_xlabel('Output Value')
+        axs[row, col].set_ylabel('Neuron State Value')
+        axs[row, col].set_xlim([-1, 1])  # 设置横轴范围
+
+    plt.tight_layout()
+    plt.show()
+
+
 # play_dataset_as_video(2800)
 show_neuron_layer1_activity()
+# show_relation_scatter()
 exit()
 
 images_index = [3492, 4574, 2352, 180, 1127]

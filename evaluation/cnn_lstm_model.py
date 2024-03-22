@@ -207,8 +207,10 @@ class Model:
 
         self.save()
         np.save(f"./results/{self.name}_train_loss_history.npy", np.array(train_loss_list))
+        print("Train loss history saved to：" + f"./results/{self.name}_train_loss_history.npy")
         if val:
             np.save(f"./results/{self.name}_eval_loss_history.npy", np.array(eval_loss_list))
+            print("Eval loss history saved to：" + f"./results/{self.name}_eval_loss_history.npy")
 
         plt.figure()
         plt.plot(train_loss_list, label="train")
