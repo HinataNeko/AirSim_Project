@@ -232,9 +232,9 @@ def show_corr_matrix_after_pca():
 #  v2[74]--throttle--负相关
 
 # 播放视频
-def play_dataset_as_video():
+def play_dataset_as_video(start_frame=0):
     cv2.destroyAllWindows()
-    idx = 0
+    idx = start_frame
     while 0 <= idx < len(all_input):
         frame = np.transpose(all_input[idx], (1, 2, 0))
 
@@ -361,10 +361,12 @@ def show_neuron_layer1_activity():
     H = 128
     labels = ['roll', 'pitch', 'throttle', 'yaw']  # 定义y轴的标签
 
-    start_frame = 2781
-    interval = 5
-    images_index = [start_frame + i * interval for i in range(5)]
-    grid_size = (7, len(images_index))
+    # start_frame = 3680
+    # interval = 5
+    # images_index = [start_frame + i * interval for i in range(7)]
+    images_index = [3680, 3686, 3694, 3710, 3718, 3725]
+    rowspan_list = [2, 3, 3, 1]  # 每一行子图的行数
+    grid_size = (sum(rowspan_list), len(images_index))
 
     plt.figure(figsize=(16, 9))
     font_size = 10
@@ -375,21 +377,23 @@ def show_neuron_layer1_activity():
     c = 0
     for i in range(len(images_index)):
         img = all_input[images_index[i]].transpose(1, 2, 0)
-        ax_img = plt.subplot2grid(grid_size, (r, c), rowspan=2, colspan=1)
+        ax_img = plt.subplot2grid(grid_size, (r, c), rowspan=rowspan_list[0], colspan=1)
         ax_img.imshow(img)
         ax_img.axis('off')  # 隐藏坐标轴
         c += 1
-    r += 2
+        if i == 0:
+            ax_img.text(-0.4, 0.5, r'$\bf{Input\ Images}$', transform=ax_img.transAxes,
+                        ha='right', va='center', fontsize=font_size)
+    r += rowspan_list[0]
 
     # 放电栅格图，all_T_spikes1: (T, N, hidden)
     c = 0
     for i in range(len(images_index)):
-        ax_spike = plt.subplot2grid(grid_size, (r, c), rowspan=2, colspan=1)
+        ax_spike = plt.subplot2grid(grid_size, (r, c), rowspan=rowspan_list[1], colspan=1)
 
         # Plotting the raster plot in the specified subplot
         t_indices, neuron_indices = np.where(all_T_spikes1[:, images_index[i]] == 1)
         ax_spike.scatter(t_indices, H - 1 - neuron_indices, marker='.', color='blue')
-        # ax_spike.set_title('Raster Plot of Spikes')
         ax_spike.set_xlabel('Time Step')
         ax_spike.set_ylabel('Neuron')
         ax_spike.set_xticks(range(T))
@@ -398,12 +402,15 @@ def show_neuron_layer1_activity():
         ax_spike.set_ylim(-2, H + 1)
         ax_spike.grid(True, which='both', linestyle='--', linewidth=0.5)
         c += 1
-    r += 2
+        if i == 0:
+            ax_spike.text(-0.4, 0.5, r'$\bf{Spikes\ Raster}$', transform=ax_spike.transAxes,
+                          ha='right', va='center', fontsize=font_size)
+    r += rowspan_list[1]
 
     # 脉冲发放率
     c = 0
     for i in range(len(images_index)):
-        ax_heatmap = plt.subplot2grid(grid_size, (r, c), rowspan=2, colspan=1)
+        ax_heatmap = plt.subplot2grid(grid_size, (r, c), rowspan=rowspan_list[2], colspan=1)
         firing_rates = np.mean(all_T_spikes1[:, images_index[i]], axis=0)
         sns_heatmap = sns.heatmap(firing_rates.reshape(-1, 1), annot=False, fmt=".3f", cmap='coolwarm',
                                   center=0.5, vmin=0, vmax=1, ax=ax_heatmap)
@@ -412,12 +419,15 @@ def show_neuron_layer1_activity():
         ax_heatmap.set_xticks([])  # 隐藏横坐标
         ax_heatmap.set_ylabel('Neuron')
         c += 1
-    r += 2
+        if i == 0:
+            ax_heatmap.text(-0.5, 0.5, r'$\bf{Firing\ Rates}$', transform=ax_heatmap.transAxes,
+                            ha='right', va='center', fontsize=font_size)
+    r += rowspan_list[2]
 
     # 输出动作
     c = 0
     for i in range(len(images_index)):
-        ax_heatmap = plt.subplot2grid(grid_size, (r, c))
+        ax_heatmap = plt.subplot2grid(grid_size, (r, c), rowspan=rowspan_list[3], colspan=1)
         sns_heatmap = sns.heatmap(all_output[images_index[i]].reshape(-1, 1), annot=True, fmt=".3f", cmap='coolwarm',
                                   center=0, vmin=-1, vmax=1, ax=ax_heatmap)
         cbar = sns_heatmap.collections[0].colorbar  # 获取热图的颜色条对象
@@ -426,13 +436,16 @@ def show_neuron_layer1_activity():
         ax_heatmap.set_yticks(ticks=np.arange(len(labels)) + 0.5)
         ax_heatmap.set_yticklabels(labels, rotation=0)
         c += 1
-    r += 1
+        if i == 0:
+            ax_heatmap.text(-0.5, 0.5, r'$\bf{Output\ Actions}$', transform=ax_heatmap.transAxes,
+                            ha='right', va='center', fontsize=font_size)
+    r += rowspan_list[3]
 
     plt.tight_layout()
     plt.show()
 
 
-# play_dataset_as_video()
+# play_dataset_as_video(2800)
 show_neuron_layer1_activity()
 exit()
 
