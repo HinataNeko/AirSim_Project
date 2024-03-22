@@ -191,7 +191,7 @@ class Model:
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.name = "CNN_SRNN_T8H128_model"
         self.T = 8
-        self.model = CNNtoRNN(T=self.T).to(self.device)
+        self.model = CNNtoRNN(rnn_hidden_size=128, T=self.T).to(self.device)
         self.cost = WeightedMSELoss()
         self.optimizer = torch.optim.Adam(self.model.parameters())
         self.checkpoint = {'model_state_dict': self.model.state_dict(),

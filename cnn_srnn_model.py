@@ -49,21 +49,6 @@ class BaseCNN(nn.Module):
         return x
 
 
-# class SpikingRNNBase(nn.Module):
-#     def __init__(self, input_size, hidden_size, v_threshold: float = 1.):
-#         super(SpikingRNNBase, self).__init__()
-#         self.hidden_size = hidden_size
-#         self.i2h = nn.Sequential(
-#             layer.Linear(input_size + hidden_size, hidden_size, step_mode='m'),
-#             neuron.LIFNode(v_threshold=v_threshold, step_mode='m'),
-#         )
-#
-#     def forward(self, input, hidden):  # (T, batch_size, hidden)
-#         combined = torch.cat((input, hidden), dim=-1)  # 将输入和隐藏状态合并
-#         hidden = self.i2h(combined)  # 计算下一个隐藏状态
-#         return hidden
-
-
 class SpikingRNNBase(nn.Module):
     def __init__(self, input_size, hidden_size, v_threshold: float = 1.):
         super(SpikingRNNBase, self).__init__()
@@ -204,7 +189,7 @@ class WeightedMSELoss(nn.Module):
 class Model:
     def __init__(self, load_dataset=True):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.name = "CNN_SRNN_model"
+        self.name = "CNN_SRNN_T8H128_model"
         self.T = 8
         self.model = CNNtoRNN(T=self.T).to(self.device)
         self.cost = WeightedMSELoss()
@@ -217,14 +202,14 @@ class Model:
         self.input_shape = (3, *self.input_size)
 
         if load_dataset:
-            self.train_dataset = CustomDataset("./datasets/uav_recording", enhance=True, random_clip=True)
-            self.train_dataloader = DataLoader(self.train_dataset, batch_size=4, shuffle=True)
-            self.test_dataset = CustomDataset("./datasets/uav_recording", enhance=False, random_clip=False)
+            self.train_dataset = CustomDataset("./datasets/train", enhance=True, random_clip=True)
+            self.train_dataloader = DataLoader(self.train_dataset, batch_size=2, shuffle=True)
+            self.test_dataset = CustomDataset("./datasets/test", enhance=False, random_clip=False)
             self.test_dataloader = DataLoader(self.test_dataset, batch_size=1, shuffle=True)
 
     def save(self):
         torch.save(self.checkpoint, self.model_save_path)
-        print("模型已保存到：" + self.model_save_path)
+        print("Model saved to：" + self.model_save_path)
 
     def load(self, path=None):
         if path is None:
@@ -233,7 +218,7 @@ class Model:
             model_data = torch.load(path)
             self.model.load_state_dict(model_data['model_state_dict'])  # 模型数据
             self.optimizer.load_state_dict(model_data['optimizer_state_dict'])  # 优化器数据
-            print("已载入之前训练的模型数据：" + path)
+            print("Previous model loaded：" + path)
 
     def predict(self, rgb_img, transform=True, start_sequence=True):
         if transform:
@@ -282,8 +267,10 @@ class Model:
 
         self.save()
         np.save(f"./results/{self.name}_train_loss_history.npy", np.array(train_loss_list))
+        print("Train loss history saved to：" + f"./results/{self.name}_train_loss_history.npy")
         if val:
             np.save(f"./results/{self.name}_eval_loss_history.npy", np.array(eval_loss_list))
+            print("Eval loss history saved to：" + f"./results/{self.name}_eval_loss_history.npy")
 
         plt.figure()
         plt.plot(train_loss_list, label="train")
@@ -397,7 +384,7 @@ class Model:
 
         return combined_image  # BGR format
 
-    def plot_one_neuron_v_s(self, rgb_img, transform=True):
+    def plot_neuron_v_s(self, rgb_img, transform=True):
         """
         if transform=True, rgb_img: (240, 320, 3), np.uint8
         if transform=False, rgb_img: (3, 240, 320), torch.float32
@@ -453,4 +440,4 @@ if __name__ == '__main__':
     # test_dataloader_iter = iter(base_model.test_dataloader)
     # for _ in range(2):
     #     input_video, _ = next(test_dataloader_iter)
-    # base_model.plot_one_neuron_v_s(input_video[0, 0], transform=False)
+    # base_model.plot_neuron_v_s(input_video[0, 0], transform=False)

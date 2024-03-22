@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import sys
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 
 from spikingjelly import visualizing
 from spikingjelly.activation_based import neuron, encoding, functional, surrogate, layer, monitor
