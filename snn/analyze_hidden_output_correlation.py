@@ -467,8 +467,8 @@ def show_relation_scatter():
     plt.show()
 
 
-# play_dataset_as_video(2800)
-show_neuron_layer1_activity()
+play_dataset_as_video(0)
+# show_neuron_layer1_activity()
 # show_relation_scatter()
 exit()
 

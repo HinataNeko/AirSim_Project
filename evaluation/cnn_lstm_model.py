@@ -143,7 +143,7 @@ class Model:
 
         if load_dataset:
             self.train_dataset = CustomDataset("./datasets/train", enhance=True, random_clip=True)
-            self.train_dataloader = DataLoader(self.train_dataset, batch_size=1, shuffle=True)
+            self.train_dataloader = DataLoader(self.train_dataset, batch_size=2, shuffle=True)
             self.test_dataset = CustomDataset("./datasets/test", enhance=False, random_clip=False)
             self.test_dataloader = DataLoader(self.test_dataset, batch_size=1, shuffle=True)
 

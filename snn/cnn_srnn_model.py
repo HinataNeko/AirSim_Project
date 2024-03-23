@@ -434,7 +434,7 @@ class Model:
 if __name__ == '__main__':
     base_model = Model()
     base_model.load()
-    # base_model.train(20)
+    base_model.train(1)
     # base_model.test()
 
     # test_dataloader_iter = iter(base_model.test_dataloader)

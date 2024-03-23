@@ -215,14 +215,25 @@ class DroneEnvWrapper:
         self.client.hoverAsync()
 
         # agent起始点随机偏移
-        max_position_offset_x = 3.
-        max_position_offset_y = 8.
-        max_position_offset_z = 5.
+        # 10~15m
+        # max_position_offset_x = 3.
+        # max_position_offset_y = 8.
+        # max_position_offset_z = 5.
+
+        # 10m
+        # max_position_offset_x = 0.
+        # max_position_offset_y = 8.
+        # max_position_offset_z = 5.
+
+        # 15m
+        # max_position_offset_x = 0.
+        # max_position_offset_y = 12.
+        # max_position_offset_z = 8.
 
         # 20m
-        # max_position_offset_x = 0.
-        # max_position_offset_y = 15.
-        # max_position_offset_z = 10.
+        max_position_offset_x = 0.
+        max_position_offset_y = 15.
+        max_position_offset_z = 10.
 
         # 25m
         # max_position_offset_x = 0.
@@ -237,7 +248,7 @@ class DroneEnvWrapper:
 
         # target起始点
         # target_pose = self.client.simGetObjectPose("target")
-        self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(12., 0., 0.),
+        self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(20., 0., 0.),
                                              orientation_val=airsim.Quaternionr(0., 0., 0., 1.))
         self.client.simSetObjectPose("target", self.target_start_pose)
         max_target_position_offset = 0.0

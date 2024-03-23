@@ -5,7 +5,9 @@ import numpy as np
 
 from EnvWrapper_Image import DroneEnvWrapper
 # from cnn_ncps_model import Model
-# from cnn_lstm_model import Model
+# from evaluation.cnn_rnn_model import Model
+# from evaluation.cnn_lstm_model import Model
+# from evaluation.cnn_gru_model import Model
 from snn.cnn_srnn_model import Model
 
 if __name__ == '__main__':
@@ -27,7 +29,7 @@ if __name__ == '__main__':
         navigation_start_sequence = True
         state = env_wrapper.reset()
 
-        for _ in range(350):  # max time step
+        for _ in range(300):  # max time step
             t1 = time.time()
             if navigation_start_sequence:
                 action = model.predict(state, start_sequence=True)
@@ -51,6 +53,7 @@ if __name__ == '__main__':
 
         if not done:
             n_overtime += 1
+            print("Overtime!")
         print('\rEpisode: {} | '
               'Step: {} | '
               'Running Time: {:.2f} | '
