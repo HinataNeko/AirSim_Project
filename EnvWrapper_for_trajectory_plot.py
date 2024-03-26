@@ -1,27 +1,14 @@
 import threading
 import cv2
 import numpy as np
-from pynput import keyboard
-import os
-import time
 import random
 import airsim
-import torch
-from torchvision import models
+
+from snn.cnn_srnn_model import Model
 
 
 class DroneEnvWrapper:
     def __init__(self, render=True):
-        self.active_keys = set()
-        self.move_keys = {'w', 'a', 's', 'd',
-                          keyboard.Key.up, keyboard.Key.down, keyboard.Key.left, keyboard.Key.right}
-        self.control_keys = {'c',  # close
-                             't',  # take off
-                             'l',  # land
-                             'p',  # reset
-                             }
-        self.valid_keys = self.move_keys | self.control_keys
-
         self.camera_width = 320
         self.camera_height = 240
         self.speed = 2.
@@ -38,13 +25,7 @@ class DroneEnvWrapper:
         self.client.armDisarm(True)  # 解锁
         self.connect()
 
-        # self.target_position = self.client.simGetObjectPose("target").position
-
         self.client.simAddDetectionFilterMeshName("0", airsim.ImageType.Scene, "target")
-
-        # self.episode_reward = 0  # 一个episode获得的奖励
-        # self.episode_distance_reward = 0
-        # self.episode_detection_reward = 0
 
     # 连接无人机
     def connect(self):
@@ -122,21 +103,6 @@ class DroneEnvWrapper:
         return x, y, w, h
 
     def step(self, action):
-        # 距离奖励
-        def get_distance_reward():
-            distance_reward = (old_distance - self.distance) * 0.1 / self.time_step
-            if distance_reward < 0:
-                distance_reward *= 2
-            distance_reward += self.target_xywh[2] * self.target_xywh[3]
-            return distance_reward
-
-        def get_detection_reward():
-            detection_reward = 0.5 - abs(self.target_xywh[0] - 0.5) - abs(self.target_xywh[1] - 0.5)  # (-0.5, 0.5)
-            detection_reward *= 0.4
-            # print(detection_reward)
-
-            return detection_reward
-
         # action: np.ndarray, 顺序(roll, pitch, thrust, yaw)
         roll, pitch, thrust, yaw = action.tolist()
 
@@ -153,7 +119,6 @@ class DroneEnvWrapper:
         self.target_position = self.target_pose.position
         self.target_orientation = self.target_pose.orientation
         self.position = self.client.simGetVehiclePose().position
-        old_distance = self.distance
         self.distance = (self.position - self.target_position).get_length()
         detection = self.client.simGetDetections("0", airsim.ImageType.Scene)
         if len(detection) == 0:
@@ -173,24 +138,12 @@ class DroneEnvWrapper:
         if len(detection) > 0:
             self.target_xywh = self.get_target_xywh(detection[0])
 
-            # 距离奖励
-            distance_reward = get_distance_reward()
-            detection_reward = get_detection_reward()
-            reward += distance_reward + detection_reward
-
-            self.episode_distance_reward += distance_reward
-            self.episode_detection_reward += detection_reward
-
             # 结束
             if self.distance < 3.5:
-                if detection_reward > 0:
-                    final_reward += 100. * 5 * detection_reward
-                # reward += 100.
                 done = True
                 successful = True
                 print("Completed!")
         else:  # 目标在视野外
-            final_reward += -50. if self.distance > 10 else -25.
             done = True
             print("The target moved out of the camera's field of view")
 
@@ -200,12 +153,7 @@ class DroneEnvWrapper:
             done = True
             print("Collided!")
 
-        # print(f"distance_reward: {distance_reward}\tdetection_reward: {detection_reward}\treward: {reward}")
-        reward += final_reward
-        self.episode_reward += reward
-        self.episode_final_reward += final_reward
-
-        return state, reward, done, successful
+        return state, self.position.to_numpy_array(), done, successful
 
     def reset(self):
         self.client.simPause(False)
@@ -276,7 +224,7 @@ class DroneEnvWrapper:
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
         state = img_rgb
 
-        return state
+        return state, self.position.to_numpy_array()
 
     def close(self):
         if not self.is_connected:
@@ -294,12 +242,28 @@ class DroneEnvWrapper:
         print("UAV connection closed.")
         exit()
 
-    def main(self):
-        print('Welcome to the Drone AirSim Control System!\r\n')
-
-        self.connect()
-
 
 if __name__ == "__main__":
-    drone = DroneEnvWrapper()
-    drone.main()
+    env_wrapper = DroneEnvWrapper(render=True)
+    model = Model(load_dataset=False)  # 导航控制模型
+    model.load()
+
+    position_list = []
+    step = 0
+    navigation_start_sequence = True
+    state, position = env_wrapper.reset()
+    position_list.append(position)
+
+    for _ in range(300):  # max time step
+        if navigation_start_sequence:
+            action = model.predict(state, start_sequence=True)
+            navigation_start_sequence = False
+        else:
+            action = model.predict(state, start_sequence=False)
+        next_state, position, done, successful = env_wrapper.step(action)
+        position_list.append(position)
+
+        state = next_state
+        step += 1
+        if done:
+            break

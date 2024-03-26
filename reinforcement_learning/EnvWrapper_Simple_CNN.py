@@ -226,7 +226,6 @@ class DroneEnvWrapper:
             vx=pitch * self.speed, vy=roll * self.speed, vz=-thrust * self.speed, duration=self.time_step,
             yaw_mode=airsim.YawMode(is_rate=True, yaw_or_rate=yaw * 30.)).join()
         self.client.simSetObjectPose("target", airsim.Pose(self.target_position + self.target_pose_random_offset))
-        self.client.simPause(True)
 
         # 更新agent和target位置
         self.target_pose = self.client.simGetObjectPose("target")
@@ -238,6 +237,8 @@ class DroneEnvWrapper:
         detection = self.client.simGetDetections("0", airsim.ImageType.Scene)
         if len(detection) == 0:
             detection = self.client.simGetDetections("0", airsim.ImageType.Scene)
+
+        self.client.simPause(True)
 
         reward = -0.1
         final_reward = 0.
@@ -288,6 +289,7 @@ class DroneEnvWrapper:
         return state, reward, done
 
     def reset(self):
+        self.client.simPause(False)
         self.client.reset()
         self.client.enableApiControl(True)  # 获取控制权
         self.client.armDisarm(True)  # 解锁
@@ -314,8 +316,6 @@ class DroneEnvWrapper:
             random.uniform(-max_target_position_offset, max_target_position_offset),
             random.uniform(-max_target_position_offset, max_target_position_offset),
             random.uniform(-max_target_position_offset, max_target_position_offset))
-
-        self.client.simPause(True)
 
         self.episode_reward = 0.
         self.episode_distance_reward = 0.
@@ -344,6 +344,7 @@ class DroneEnvWrapper:
             state = None
             print("Reset Error")
 
+        self.client.simPause(True)
         return state
 
     def close(self):

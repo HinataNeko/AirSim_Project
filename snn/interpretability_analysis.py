@@ -5,15 +5,16 @@ import numpy as np
 from scipy.stats import pearsonr
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+import matplotlib.gridspec as gridspec
 from tqdm import tqdm
 import sys
-from sklearn.decomposition import PCA
 
-from spikingjelly import visualizing
 from spikingjelly.activation_based import neuron, encoding, functional, surrogate, layer, monitor
 
 from load_dataset import CustomDataset
 from cnn_srnn_model import Model
+from EnvWrapper_for_trajectory_plot import DroneEnvWrapper
 
 all_dataset = CustomDataset("./datasets/uav_recording", enhance=False, random_clip=False)
 all_dataloader = DataLoader(all_dataset, batch_size=1, shuffle=False)
@@ -45,33 +46,33 @@ spike_seq_monitor1 = monitor.OutputMonitor(net=net.srnn.rnn1, instance=neuron.LI
 v_seq_monitor2 = monitor.AttributeMonitor(attribute_name='v_seq', pre_forward=False,
                                           net=net.srnn.rnn2, instance=neuron.LIFNode)
 
-with torch.no_grad():
-    for batch_data, _ in tqdm(all_dataloader, file=sys.stdout, leave=False):
-        all_input.append(batch_data.squeeze(0))
-        batch_data = batch_data.to(model.device)
-        batch_output = net(batch_data)  # (batch_size, frames, output)
-
-        all_spike_rate1.extend(spike_seq_monitor1.records)
-        all_v_last1.extend(v_seq_monitor1.records)
-        all_v_last2.extend(v_seq_monitor2.records)
-        all_output.append(batch_output.squeeze(0))
-
-        spike_seq_monitor1.clear_recorded_data()  # list: [Tensor: (T, batch_size, hidden)]
-        v_seq_monitor1.clear_recorded_data()  # list: [Tensor: (T, batch_size, hidden)]
-        v_seq_monitor2.clear_recorded_data()  # list: [Tensor: (T, batch_size, hidden)]
-
-    all_spike_rate1 = torch.stack(all_spike_rate1, dim=1).squeeze(2)  # (T, N, hidden), N为所有图像数
-    all_v_last1 = torch.stack(all_v_last1, dim=1).squeeze(2)  # (T, N, hidden), N为所有图像数
-    all_v_last2 = torch.stack(all_v_last2, dim=1).squeeze(2)  # (T, N, hidden), N为所有图像数
-
-    all_T_spikes1 = all_spike_rate1.cpu().numpy()  # (T, N, hidden), N为所有图像数
-    all_T_v1 = all_v_last1.cpu().numpy()  # (T, N, hidden), N为所有图像数
-    all_T_v2 = all_v_last2.cpu().numpy()  # (T, N, hidden), N为所有图像数
-    all_spike_rate1 = torch.mean(all_spike_rate1, dim=0).cpu().numpy()  # (N, hidden), N为所有图像数
-    all_v_last2 = all_v_last2[-1, ...].cpu().numpy()  # (N, hidden), N为所有图像数
-
-    all_input = torch.cat(all_input, dim=0).cpu().numpy()  # (N, C, H, W), N为所有图像数
-    all_output = torch.cat(all_output, dim=0).cpu().numpy()  # (N, output), N为所有图像数
+# with torch.no_grad():
+#     for batch_data, _ in tqdm(all_dataloader, file=sys.stdout, leave=False):
+#         all_input.append(batch_data.squeeze(0))
+#         batch_data = batch_data.to(model.device)
+#         batch_output = net(batch_data)  # (batch_size, frames, output)
+#
+#         all_spike_rate1.extend(spike_seq_monitor1.records)
+#         all_v_last1.extend(v_seq_monitor1.records)
+#         all_v_last2.extend(v_seq_monitor2.records)
+#         all_output.append(batch_output.squeeze(0))
+#
+#         spike_seq_monitor1.clear_recorded_data()  # list: [Tensor: (T, batch_size, hidden)]
+#         v_seq_monitor1.clear_recorded_data()  # list: [Tensor: (T, batch_size, hidden)]
+#         v_seq_monitor2.clear_recorded_data()  # list: [Tensor: (T, batch_size, hidden)]
+#
+#     all_spike_rate1 = torch.stack(all_spike_rate1, dim=1).squeeze(2)  # (T, N, hidden), N为所有图像数
+#     all_v_last1 = torch.stack(all_v_last1, dim=1).squeeze(2)  # (T, N, hidden), N为所有图像数
+#     all_v_last2 = torch.stack(all_v_last2, dim=1).squeeze(2)  # (T, N, hidden), N为所有图像数
+#
+#     all_T_spikes1 = all_spike_rate1.cpu().numpy()  # (T, N, hidden), N为所有图像数
+#     all_T_v1 = all_v_last1.cpu().numpy()  # (T, N, hidden), N为所有图像数
+#     all_T_v2 = all_v_last2.cpu().numpy()  # (T, N, hidden), N为所有图像数
+#     all_spike_rate1 = torch.mean(all_spike_rate1, dim=0).cpu().numpy()  # (N, hidden), N为所有图像数
+#     all_v_last2 = all_v_last2[-1, ...].cpu().numpy()  # (N, hidden), N为所有图像数
+#
+#     all_input = torch.cat(all_input, dim=0).cpu().numpy()  # (N, C, H, W), N为所有图像数
+#     all_output = torch.cat(all_output, dim=0).cpu().numpy()  # (N, output), N为所有图像数
 
 # n_hidden = 128
 # n_output = 4
@@ -97,7 +98,7 @@ def show_neuron_layer1_activity():
     # 右下方: 4574, 4642, 4706
     # 左下方: 361, 2352, 6055, 2402
     # 中心: 1221, 2326, 4820
-    images_index = [2730, 1010, 2564, 113, 4574, 4706, 361, 6055, 1221, 2326]
+    images_index = [1010, 2730, 113, 2564, 4706, 4574, 6055, 361, 1221, 2326]
     n_firings = np.max(all_T_spikes1[:, images_index], axis=0).sum(axis=1).astype(int)
     rowspan_list = [2, 5, 1, 2]  # 每一行子图的行数
     grid_size = (sum(rowspan_list), len(images_index))
@@ -200,5 +201,205 @@ def draw_firing_counts_by_position():
     plt.show()
 
 
+def plot_trajectory_with_spike_rate_heatmap_2d(trajectory_coords, neuron_spike_rates, cmap='coolwarm'):
+    """
+    绘制无人机飞行轨迹的热图，其中轨迹的颜色变化表示了神经元脉冲发放率的变化。
+
+    参数:
+    - trajectory_coords: 无人机飞行轨迹坐标的数组，形状为(T, 2)。
+    - neuron_spike_rates: 每个时间步的神经元脉冲发放率的数组，长度为T。
+    - cmap: 使用的colormap名称。
+    """
+    T = len(neuron_spike_rates)
+
+    # 创建颜色映射
+    color_map = mpl.colormaps.get_cmap(cmap)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    for i in range(T - 1):
+        # 计算当前和下一个时间步的坐标
+        x = trajectory_coords[i:i + 2, 0]
+        y = trajectory_coords[i:i + 2, 1]
+
+        # 获取当前时间步的脉冲发放率，根据脉冲发放率选择颜色
+        color = color_map(neuron_spike_rates[i])
+
+        # 绘制这一小段轨迹
+        plt.plot(x, y, color=color, linewidth=2)
+
+    # 添加颜色条
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0, vmax=1))
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax, fraction=0.046, pad=0.04)  # 调整颜色条的大小和间距
+    cbar.set_label('Spike Rate')
+
+    ax.set_title('Drone Flight Trajectory with Neuron Spike Rate Heatmap')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    plt.show()
+
+
+def plot_trajectory_with_spike_rate_heatmap_3d(ax, trajectory_coords, neuron_spike_rates, cmap='coolwarm'):
+    """
+    绘制无人机三维飞行轨迹的热图，其中轨迹的颜色变化表示了神经元脉冲发放率的变化。
+
+    参数:
+    - trajectory_coords: 无人机飞行轨迹坐标的数组，形状为(T, 3)。
+    - neuron_spike_rates: 每个时间步的神经元脉冲发放率的数组，长度为T。
+    - cmap: 使用的colormap名称。
+    """
+    T = len(neuron_spike_rates)
+
+    # 创建颜色映射
+    color_map = mpl.colormaps.get_cmap(cmap)
+
+    # fig = plt.figure(figsize=(6, 6))
+    # ax = fig.add_subplot(111, projection='3d')
+
+    trajectory_coords = trajectory_coords - trajectory_coords[0, :]  # 将轨迹平移到坐标原点
+    for i in range(T - 1):
+        # 计算当前和下一个时间步的坐标
+        x = trajectory_coords[i:i + 2, 0]
+        y = trajectory_coords[i:i + 2, 1]
+        z = trajectory_coords[i:i + 2, 2]
+
+        # 获取当前时间步的脉冲发放率，根据脉冲发放率选择颜色
+        color = color_map(neuron_spike_rates[i])
+
+        # 绘制这一小段轨迹
+        ax.plot(x, y, z, color=color, linewidth=2)
+
+    # 添加颜色条
+    sm = mpl.cm.ScalarMappable(cmap=cmap, norm=mpl.colors.Normalize(vmin=0, vmax=1))
+    sm.set_array([])
+    # cbar = fig.colorbar(sm, ax=ax, fraction=0.04, pad=0.1, aspect=15)  # 调整颜色条的大小和间距
+    # cbar.set_label('Spike Rate')
+
+    # ax.set_title('3D Drone Flight Trajectory with Neuron Spike Rate Heatmap', fontsize=12, pad=8)
+
+    # 在起点和终点处绘制特殊标记
+    ax.scatter(*trajectory_coords[0, :], color='green', s=90, marker='o', label='Start')
+    ax.scatter(*trajectory_coords[-1, :], color='red', s=90, marker='X', label='End')
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    ax.set_xlim((0, 20))
+    ax.set_ylim((-10, 10))
+    ax.set_zlim((-10, 10))
+    ax.legend()
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    # plt.show()
+
+
+def run_trajectory_with_spike_rate_heatmap_3d():
+    env_wrapper = DroneEnvWrapper(render=True)
+
+    position_list = []
+    all_spike_rate1 = []
+    step = 0
+    navigation_start_sequence = True
+    state, position = env_wrapper.reset()
+    position_list.append(position)
+
+    for _ in range(300):  # max time step
+        if navigation_start_sequence:
+            action = model.predict(state, start_sequence=True)
+            navigation_start_sequence = False
+        else:
+            action = model.predict(state, start_sequence=False)
+
+        all_spike_rate1.extend(spike_seq_monitor1.records)
+        spike_seq_monitor1.clear_recorded_data()  # list: [Tensor: (T, batch_size, hidden)]
+        v_seq_monitor1.clear_recorded_data()  # list: [Tensor: (T, batch_size, hidden)]
+        v_seq_monitor2.clear_recorded_data()  # list: [Tensor: (T, batch_size, hidden)]
+
+        next_state, position, done, successful = env_wrapper.step(action)
+        position_list.append(position)
+
+        state = next_state
+        step += 1
+        if done:
+            break
+
+    position_array = np.array(position_list)
+    position_array[:, -1] = -position_array[:, -1]
+    all_spike_rate1 = torch.stack(all_spike_rate1, dim=1).squeeze(2)  # (T, N, hidden), N为所有图像数
+    all_spike_rate1 = torch.mean(all_spike_rate1, dim=0).cpu().numpy()  # (N, hidden), N为所有图像数
+
+    neuron_index = [0, 2, 10, 25, 70]
+    n_neurons = len(neuron_index)
+    fig = plt.figure(figsize=(18, 5))
+    gs = gridspec.GridSpec(1, n_neurons + 1, width_ratios=[*[1 for _ in range(n_neurons)], 0.5])  # 最后一个数字控制颜色条的宽度
+
+    for i, idx in enumerate(neuron_index):
+        # ax = fig.add_subplot(1, n_neurons, i + 1, projection='3d')
+        ax = fig.add_subplot(gs[i], projection='3d')
+        plot_trajectory_with_spike_rate_heatmap_3d(ax, position_array, all_spike_rate1[:, idx], cmap='coolwarm')
+        ax.set_title(f'Neuron {idx}')
+
+    # 在大图旁边添加一个共享的颜色条
+    sm = mpl.cm.ScalarMappable(cmap='coolwarm', norm=mpl.colors.Normalize(vmin=0, vmax=1))
+    sm.set_array([])
+    cax = fig.add_axes([0.93, 0.2, 0.01, 0.6])  # [左, 下, 宽, 高]，数值是相对于整个画布的比例
+    cbar = fig.colorbar(sm, cax=cax)
+    # cax = fig.add_subplot(gs[5])  # 为颜色条分配独立的格子
+    # cbar = fig.colorbar(sm, cax=cax, fraction=0.02, pad=0.5, aspect=10)  # 调整颜色条的大小和间距
+    cbar.set_label('Spike Rate')
+
+    plt.tight_layout()
+    plt.show()
+
+
+"""==============================SpikingRNN第二层，神经元与输出动作相关系数统计=============================="""
+
+
+def get_corr_matrix(array1, array2):  # 形状均为(N, H)
+    n_h1 = array1.shape[-1]
+    n_h2 = array2.shape[-1]
+    corr_matrix = np.empty((n_h1, n_h2))  # 初始化相关系数矩阵
+    for i in range(n_h1):
+        for j in range(n_h2):
+            # 检查输入是否是常数数组
+            if np.std(array1[:, i]) == 0 or np.std(array2[:, j]) == 0:
+                corr_matrix[i, j] = 0
+            else:
+                corr_matrix[i, j], _ = pearsonr(array1[:, i], array2[:, j])
+    return corr_matrix  # (n_h1, n_h2)
+
+
+def plot_output_neuron_correlation_distributions():
+    corr_matrix = get_corr_matrix(all_v_last2, all_output)  # (H, Output)
+
+    # 设置图表的风格和颜色方案
+    sns.set(style="darkgrid")
+    action_labels = ['Roll', 'Pitch', 'Throttle', 'Yaw']
+
+    # 创建2x2子图
+    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
+
+    for i, ax in enumerate(axs.flat):
+        # 使用seaborn的kdeplot函数绘制每个输出动作的相关性分布的KDE图
+        sns.kdeplot(corr_matrix[:, i], ax=ax, fill=True, color='skyblue', edgecolor='black', linewidth=1.5)
+        ax.set_title(action_labels[i], fontsize=14, pad=10)
+        ax.set_xlabel('Correlation', fontsize=12, labelpad=10)
+        ax.set_ylabel('Density', fontsize=12, labelpad=10)
+        ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax.tick_params(axis='both', which='major', labelsize=10)
+
+    # 添加总标题
+    fig.suptitle('Neuron Correlation Distributions with Output Actions', fontsize=16, y=1.05)
+    plt.tight_layout()
+    plt.show()
+
+
 # show_neuron_layer1_activity()
-draw_firing_counts_by_position()
+# draw_firing_counts_by_position()
+
+# trajectory_coords = np.random.rand(150, 3)  # 3D轨迹坐标
+# neuron_spike_rates = np.linspace(0, 1, 150)  # 模拟的脉冲发放率，从0渐变到1
+# plot_trajectory_with_spike_rate_heatmap_3d(trajectory_coords, neuron_spike_rates)
+run_trajectory_with_spike_rate_heatmap_3d()
+
+# plot_output_neuron_correlation_distributions()

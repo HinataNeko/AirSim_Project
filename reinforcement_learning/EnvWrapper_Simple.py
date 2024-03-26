@@ -296,6 +296,7 @@ class DroneEnvWrapper:
         return state, reward, done
 
     def reset(self):
+        self.client.simPause(False)
         self.client.reset()
         self.client.enableApiControl(True)  # 获取控制权
         self.client.armDisarm(True)  # 解锁
@@ -322,8 +323,6 @@ class DroneEnvWrapper:
             random.uniform(-max_target_position_offset, max_target_position_offset),
             random.uniform(-max_target_position_offset, max_target_position_offset))
 
-        self.client.simPause(True)
-
         self.episode_reward = 0.
         self.episode_distance_reward = 0.
         self.episode_detection_reward = 0.
@@ -347,6 +346,7 @@ class DroneEnvWrapper:
             state = None
             print("Reset Error")
 
+        self.client.simPause(True)
         return state
 
     def close(self):
