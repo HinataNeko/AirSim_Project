@@ -120,6 +120,9 @@ class CNNtoRNN(nn.Module):
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+        # total = sum([param.element() for param in self.cnn.parameters()])
+        # print("CNN Number of parameter: %.2fK" % (total / 1e3))
+
     def _reset_hidden(self):
         self.hidden = torch.zeros(self.rnn_layers, self.T, 1, self.rnn_hidden_size).to(self.device)
 

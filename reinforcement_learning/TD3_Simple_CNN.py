@@ -10,7 +10,7 @@ import numpy as np
 
 from EnvWrapper_Simple_CNN import DroneEnvWrapper
 
-NAME = 'td3_simple_cnn'
+NAME = 'TD3_Simple_CNN'
 MODE = 'train'
 
 state_dim = 128
@@ -24,7 +24,7 @@ TAU = 0.005  # soft replacement
 MEMORY_CAPACITY = 500000  # size of replay buffer
 BATCH_SIZE = 256  # update batch_size
 
-MAX_EPISODES = 100  # total number of episodes for training
+MAX_EPISODES = 1000  # total number of episodes for training
 MAX_EP_STEPS = 300  # total number of steps for each episode
 EXPLORE_EPISODES = 0  # for random action sampling in the beginning of training
 UPDATE_ITR = 2  # repeated updates for each step
@@ -45,7 +45,7 @@ class ReplayBuffer:
     :done: (,), scalar (0 and 1) or bool (True and False)
     """
 
-    def __init__(self, capacity, state_dim, action_dim, file_name=f'{NAME}_memory.npz'):
+    def __init__(self, capacity, state_dim, action_dim, save_folder='./saved_model', file_name=f'{NAME}_memory.npz'):
         self.capacity = capacity  # buffer的最大值
         self.memory = {
             'state': np.zeros((capacity, state_dim), dtype=np.float32),
@@ -56,8 +56,8 @@ class ReplayBuffer:
         }
         self.position = 0  # 当前输入的位置，相当于指针
         self.is_full = False
-        self.memory_save_path = 'saved_model/'
-        self.memory_path = self.memory_save_path + file_name
+        self.memory_save_folder = save_folder
+        self.memory_save_path = os.path.join(self.memory_save_folder, file_name)
 
     def push(self, state, action, reward, next_state, done):
         self.memory['state'][self.position] = state
@@ -82,15 +82,15 @@ class ReplayBuffer:
         return batch['state'], batch['action'], batch['reward'], batch['next_state'], batch['done']
 
     def save_memory(self):
-        if not os.path.exists(self.memory_save_path):
-            os.makedirs(self.memory_save_path)
+        if not os.path.exists(self.memory_save_folder):
+            os.makedirs(self.memory_save_folder)
 
-        np.savez(self.memory_path, **self.memory, position=self.position, is_full=self.is_full)
+        np.savez(self.memory_save_path, **self.memory, position=self.position, is_full=self.is_full)
         print('Memory saved!')
 
     def load_memory(self):
-        if os.path.exists(self.memory_path):
-            data = np.load(self.memory_path)
+        if os.path.exists(self.memory_save_path):
+            data = np.load(self.memory_save_path)
             previous_capacity = len(data['state'])
             previous_position = int(data['position'])
             previous_is_full = bool(data['is_full'])
@@ -135,10 +135,10 @@ class DoubleReplayBuffer:
     :done: (,), scalar (0 and 1) or bool (True and False)
     """
 
-    def __init__(self, capacity, state_dim, action_dim):
-        self.good_replay_buffer = ReplayBuffer(capacity // 2, state_dim, action_dim,
+    def __init__(self, capacity, state_dim, action_dim, save_folder='./saved_model'):
+        self.good_replay_buffer = ReplayBuffer(capacity // 2, state_dim, action_dim, save_folder=save_folder,
                                                file_name=f'{NAME}_good_memory.npz')
-        self.bad_replay_buffer = ReplayBuffer(capacity // 2, state_dim, action_dim,
+        self.bad_replay_buffer = ReplayBuffer(capacity // 2, state_dim, action_dim, save_folder=save_folder,
                                               file_name=f'{NAME}_bad_memory.npz')
 
     def push(self, state, action, reward, next_state, done):
@@ -269,7 +269,9 @@ class TD3:
                  action_dim,
                  hidden_dim=256,
                  ):
-        self.replay_buffer = DoubleReplayBuffer(MEMORY_CAPACITY, state_dim, action_dim)
+        self.save_folder = './saved_model/'
+        self.model_save_path = os.path.join(self.save_folder, f'{NAME}_model.pth')
+        self.replay_buffer = DoubleReplayBuffer(MEMORY_CAPACITY, state_dim, action_dim, save_folder=self.save_folder)
 
         self.update_cnt = 0  # 更新次数
         self.learning_started = False
@@ -289,8 +291,6 @@ class TD3:
         self.q_optimizer1 = torch.optim.Adam(self.q_net1.parameters(), lr=LR_C)
         self.q_optimizer2 = torch.optim.Adam(self.q_net2.parameters(), lr=LR_C)
 
-        self.model_save_folder = 'saved_model/'
-        self.model_path = self.model_save_folder + f'{NAME}.pth'
         self.checkpoint = {'actor_state_dict': self.actor.state_dict(),
                            'actor_target_state_dict': self.actor_target.state_dict(),
                            'q_net1_state_dict': self.q_net1.state_dict(),
@@ -374,15 +374,15 @@ class TD3:
             self.target_soft_update()
 
     def save_weights(self):
-        if not os.path.exists(self.model_save_folder):
-            os.makedirs(self.model_save_folder)
+        if not os.path.exists(self.save_folder):
+            os.makedirs(self.save_folder)
 
-        torch.save(self.checkpoint, self.model_path)
+        torch.save(self.checkpoint, self.model_save_path)
         print('Model saved!')
 
     def load_weights(self):  # load trained weights
-        if os.path.exists(self.model_path):
-            model_data = torch.load(self.model_path)
+        if os.path.exists(self.model_save_path):
+            model_data = torch.load(self.model_save_path)
             self.actor.load_state_dict(model_data['actor_state_dict'])
             self.actor_target.load_state_dict(model_data['actor_target_state_dict'])
             self.q_net1.load_state_dict(model_data['q_net1_state_dict'])
@@ -402,7 +402,7 @@ class TD3:
 
 
 if __name__ == '__main__':
-    env_wrapper = DroneEnvWrapper()
+    env_wrapper = DroneEnvWrapper(render=False)
 
     # initialization of trainer
     td3 = TD3(state_dim=state_dim, action_dim=action_dim)

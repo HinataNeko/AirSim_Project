@@ -162,6 +162,7 @@ class DroneEnvWrapper:
         self.client.armDisarm(True)  # 解锁
         self.client.takeoffAsync()
         self.client.hoverAsync()
+        self.client.moveByVelocityBodyFrameAsync(vx=0, vy=0, vz=0, duration=0.02).join()
 
         # agent起始点随机偏移
         # 10~15m

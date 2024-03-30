@@ -290,7 +290,6 @@ def plot_trajectory_with_spike_rate_heatmap_3d(ax, trajectory_coords, neuron_spi
     ax.set_zlim((-10, 10))
     ax.legend()
     ax.tick_params(axis='both', which='major', labelsize=10)
-    # plt.show()
 
 
 def run_trajectory_with_spike_rate_heatmap_3d():
@@ -328,25 +327,43 @@ def run_trajectory_with_spike_rate_heatmap_3d():
     all_spike_rate1 = torch.stack(all_spike_rate1, dim=1).squeeze(2)  # (T, N, hidden), N为所有图像数
     all_spike_rate1 = torch.mean(all_spike_rate1, dim=0).cpu().numpy()  # (N, hidden), N为所有图像数
 
-    neuron_index = [0, 2, 10, 25, 70]
+    def synchronize_view(axs):
+        """
+        视角同步
+        """
+        # 获取第一个轴对象的视角
+        elev, azim = axs[0].elev, axs[0].azim
+
+        # 同步所有其他轴对象的视角
+        for ax in axs[1:]:
+            ax.view_init(elev=elev, azim=azim)
+
+        plt.draw()  # 重绘图表
+
+    neuron_index = [3, 2, 74, 1, 102, 67]
     n_neurons = len(neuron_index)
     fig = plt.figure(figsize=(18, 5))
+
+    axs = []  # 存储所有子图的列表
     gs = gridspec.GridSpec(1, n_neurons + 1, width_ratios=[*[1 for _ in range(n_neurons)], 0.5])  # 最后一个数字控制颜色条的宽度
 
     for i, idx in enumerate(neuron_index):
-        # ax = fig.add_subplot(1, n_neurons, i + 1, projection='3d')
         ax = fig.add_subplot(gs[i], projection='3d')
+        axs.append(ax)  # 将子图添加到列表中
         plot_trajectory_with_spike_rate_heatmap_3d(ax, position_array, all_spike_rate1[:, idx], cmap='coolwarm')
         ax.set_title(f'Neuron {idx}')
 
     # 在大图旁边添加一个共享的颜色条
     sm = mpl.cm.ScalarMappable(cmap='coolwarm', norm=mpl.colors.Normalize(vmin=0, vmax=1))
     sm.set_array([])
-    cax = fig.add_axes([0.93, 0.2, 0.01, 0.6])  # [左, 下, 宽, 高]，数值是相对于整个画布的比例
+    cax = fig.add_axes([0.93, 0.2, 0.01, 0.5])  # [左, 下, 宽, 高]，数值是相对于整个画布的比例
     cbar = fig.colorbar(sm, cax=cax)
-    # cax = fig.add_subplot(gs[5])  # 为颜色条分配独立的格子
-    # cbar = fig.colorbar(sm, cax=cax, fraction=0.02, pad=0.5, aspect=10)  # 调整颜色条的大小和间距
     cbar.set_label('Spike Rate')
+
+    # 设置定时器，定期同步视角
+    timer = fig.canvas.new_timer(interval=500)  # 时间间隔设置为100毫秒
+    timer.add_callback(synchronize_view, axs)
+    timer.start()
 
     plt.tight_layout()
     plt.show()
@@ -384,12 +401,14 @@ def plot_output_neuron_correlation_distributions():
         sns.kdeplot(corr_matrix[:, i], ax=ax, fill=True, color='skyblue', edgecolor='black', linewidth=1.5)
         ax.set_title(action_labels[i], fontsize=14, pad=10)
         ax.set_xlabel('Correlation', fontsize=12, labelpad=10)
-        ax.set_ylabel('Density', fontsize=12, labelpad=10)
+        ax.set_ylabel('Probability Density', fontsize=12, labelpad=10)
         ax.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax.tick_params(axis='both', which='major', labelsize=10)
 
+        ax.set_xlim(-1.5, 1.5)
+
     # 添加总标题
-    fig.suptitle('Neuron Correlation Distributions with Output Actions', fontsize=16, y=1.05)
+    fig.suptitle('Neuron Correlation Distributions with Output Actions', fontsize=16)
     plt.tight_layout()
     plt.show()
 
@@ -397,9 +416,6 @@ def plot_output_neuron_correlation_distributions():
 # show_neuron_layer1_activity()
 # draw_firing_counts_by_position()
 
-# trajectory_coords = np.random.rand(150, 3)  # 3D轨迹坐标
-# neuron_spike_rates = np.linspace(0, 1, 150)  # 模拟的脉冲发放率，从0渐变到1
-# plot_trajectory_with_spike_rate_heatmap_3d(trajectory_coords, neuron_spike_rates)
 run_trajectory_with_spike_rate_heatmap_3d()
 
 # plot_output_neuron_correlation_distributions()
