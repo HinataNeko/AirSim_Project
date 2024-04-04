@@ -13,34 +13,44 @@ cnn_srnn_eval_loss = np.load('./results/train_history/CNN_SRNN_T8H128_model_eval
 
 # np.save('./results/CNN_LSTM_model_train_loss_history.npy', cnn_lstm_train_loss)
 
-plt.figure(figsize=(12, 7))  # 使用高分辨率
-
-# 定义一个清晰的颜色方案
+plt.figure(figsize=(10, 5))  # 使用高分辨率
 colors = ['blue', 'green', 'red', 'purple']
 
 plt.subplot(1, 2, 1)
-plt.plot(cnn_rnn_train_loss, label='Naive RNN', color=colors[0], linewidth=2, linestyle=':')
-plt.plot(cnn_lstm_train_loss, label='LSTM', color=colors[1], linewidth=2, linestyle='-.')
-plt.plot(cnn_gru_train_loss, label='GRU', color=colors[2], linewidth=2, linestyle='--')
-plt.plot(cnn_srnn_train_loss, label='Spiking RNN', color=colors[3], linewidth=2, linestyle='-')
+plt.plot(cnn_rnn_train_loss, label='Naive RNN', color=colors[0], linewidth=1.5)
+plt.plot(cnn_lstm_train_loss, label='LSTM', color=colors[1], linewidth=1.5)
+plt.plot(cnn_gru_train_loss, label='GRU', color=colors[2], linewidth=1.5)
+plt.plot(cnn_srnn_train_loss, label='SRNN', color=colors[3], linewidth=1.5)
 plt.title('Training Loss', fontsize=14)
 plt.xlabel('Epoch', fontsize=12)
 plt.ylabel('Loss', fontsize=12)
+plt.xlim(0, 100)
 plt.ylim(0, 0.8)
 plt.legend(fontsize=10, loc='upper right')
-plt.grid(True, linestyle='--', linewidth=0.5, alpha=0.5)
+plt.grid(True, linestyle='--', linewidth=0.75, alpha=0.75, axis='y')
+
+# 隐藏上方和右边的坐标轴
+ax = plt.gca()  # 获取当前轴
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
 
 plt.subplot(1, 2, 2)
-plt.plot(cnn_rnn_eval_loss, label='Naive RNN', color=colors[0], linewidth=2, linestyle=':')
-plt.plot(cnn_lstm_eval_loss, label='LSTM', color=colors[1], linewidth=2, linestyle='-.')
-plt.plot(cnn_gru_eval_loss, label='GRU', color=colors[2], linewidth=2, linestyle='--')
-plt.plot(cnn_srnn_eval_loss, label='Spiking RNN', color=colors[3], linewidth=2, linestyle='-')
+plt.plot(cnn_rnn_eval_loss, label='Naive RNN', color=colors[0], linewidth=1.5)
+plt.plot(cnn_lstm_eval_loss, label='LSTM', color=colors[1], linewidth=1.5)
+plt.plot(cnn_gru_eval_loss, label='GRU', color=colors[2], linewidth=1.5)
+plt.plot(cnn_srnn_eval_loss, label='SRNN', color=colors[3], linewidth=1.5)
 plt.title('Validation Loss', fontsize=14)
 plt.xlabel('Epoch', fontsize=12)
 plt.ylabel('Loss', fontsize=12)
+plt.xlim(0, 100)
 plt.ylim(0, 0.8)
 plt.legend(fontsize=10, loc='upper right')
-plt.grid(True, linestyle='--', linewidth=0.5, alpha=0.5)
+plt.grid(True, linestyle='--', linewidth=0.75, alpha=0.75, axis='y')
+
+# 隐藏上方和右边的坐标轴
+ax = plt.gca()  # 获取当前轴
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
 
 plt.tight_layout()  # 确保子图之间有足够的空间
 plt.show()

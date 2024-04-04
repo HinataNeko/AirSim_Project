@@ -183,18 +183,18 @@ def draw_firing_counts_by_position():
     color_palette = plt.get_cmap('coolwarm')
 
     # 创建柱状图
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(7, 5))
     bars = plt.bar(positions, average_firings, color=colors)
 
     # 为每个柱子添加数值标签
     for bar in bars:
         yval = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width() / 2, yval + 0.4, yval, ha='center', va='bottom', fontsize=14)
+        plt.text(bar.get_x() + bar.get_width() / 2, yval + 0.2, yval, ha='center', va='bottom', fontsize=12)
 
     # 设置图表标题和轴标签
     plt.title('Average Neuron Firings by Target Position in Visual Field', pad=20)
-    plt.xlabel('Target Position', labelpad=15)
-    plt.ylabel('Average Neuron Firings', labelpad=15)
+    plt.xlabel('Target Position', labelpad=14)
+    plt.ylabel('Average Neuron Firings', labelpad=14)
 
     # 调整图表布局并显示
     plt.tight_layout()
@@ -288,6 +288,7 @@ def plot_trajectory_with_spike_rate_heatmap_3d(ax, trajectory_coords, neuron_spi
     ax.set_xlim((0, 20))
     ax.set_ylim((-10, 10))
     ax.set_zlim((-10, 10))
+    ax.invert_yaxis()  # 翻转Y轴
     ax.legend()
     ax.tick_params(axis='both', which='major', labelsize=10)
 
@@ -340,7 +341,7 @@ def run_trajectory_with_spike_rate_heatmap_3d():
 
         plt.draw()  # 重绘图表
 
-    neuron_index = [3, 2, 74, 1, 102, 67]
+    neuron_index = [2, 3, 74, 1, 102]  # 左，右，上，下，前
     n_neurons = len(neuron_index)
     fig = plt.figure(figsize=(18, 5))
 
@@ -356,7 +357,7 @@ def run_trajectory_with_spike_rate_heatmap_3d():
     # 在大图旁边添加一个共享的颜色条
     sm = mpl.cm.ScalarMappable(cmap='coolwarm', norm=mpl.colors.Normalize(vmin=0, vmax=1))
     sm.set_array([])
-    cax = fig.add_axes([0.93, 0.2, 0.01, 0.5])  # [左, 下, 宽, 高]，数值是相对于整个画布的比例
+    cax = fig.add_axes([0.93, 0.2, 0.01, 0.6])  # [左, 下, 宽, 高]，数值是相对于整个画布的比例
     cbar = fig.colorbar(sm, cax=cax)
     cbar.set_label('Spike Rate')
 

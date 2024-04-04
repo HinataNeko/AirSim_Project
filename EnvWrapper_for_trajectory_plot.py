@@ -190,10 +190,18 @@ class DroneEnvWrapper:
         # max_position_offset_y = 18.
         # max_position_offset_z = 12.
 
-        random_position = airsim.Pose(airsim.Vector3r(
-            random.uniform(-max_position_offset_x, max_position_offset_x),
-            random.uniform(-max_position_offset_y, max_position_offset_y),
-            random.uniform(-max_position_offset_z, max_position_offset_z)))
+        # random_position = airsim.Pose(airsim.Vector3r(
+        #     random.uniform(-max_position_offset_x, max_position_offset_x),
+        #     random.uniform(-max_position_offset_y, max_position_offset_y),
+        #     random.uniform(-max_position_offset_z, max_position_offset_z)))
+        random_position = airsim.Pose(airsim.Vector3r(  # 左上方
+            random.uniform(0, 0),
+            random.uniform(10, 10),
+            random.uniform(8, 8)))
+        # random_position = airsim.Pose(airsim.Vector3r(  # 右下方
+        #     random.uniform(0, 0),
+        #     random.uniform(-10, -10),
+        #     random.uniform(-8, -8)))
         self.client.simSetVehiclePose(random_position, ignore_collision=True)
 
         # target起始点

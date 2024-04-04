@@ -266,7 +266,7 @@ def show_neuron_layer2_activity():
     labels = ['roll', 'pitch', 'throttle', 'yaw']  # 定义y轴的标签
 
     # images_index = [0, 112, 1127, 2204, 2352, 3492, 4574]
-    images_index = [3492, 4574, 2352, 180, 1127]
+    images_index = [3492, 4574, 2352, 180]
     grid_size = (len(images_index), 11)
     colors = [['red', 'blue', 'red', 'blue'],
               ['red', 'blue', 'blue', 'red'],
@@ -467,8 +467,9 @@ def show_relation_scatter():
     plt.show()
 
 
-play_dataset_as_video(0)
+# play_dataset_as_video(0)
 # show_neuron_layer1_activity()
+show_neuron_layer2_activity()
 # show_relation_scatter()
 exit()
 

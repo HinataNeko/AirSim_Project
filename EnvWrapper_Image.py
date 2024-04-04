@@ -11,7 +11,7 @@ from torchvision import models
 
 
 class DroneEnvWrapper:
-    def __init__(self, render=True):
+    def __init__(self, render=True, image_noise=False):
         self.active_keys = set()
         self.move_keys = {'w', 'a', 's', 'd',
                           keyboard.Key.up, keyboard.Key.down, keyboard.Key.left, keyboard.Key.right}
@@ -26,8 +26,10 @@ class DroneEnvWrapper:
         self.camera_height = 240
         self.speed = 2.
         self.time_step = 0.05
+        self.image_noise_var = 0.5
 
         self.render = render
+        self.image_noise = image_noise
         self.is_connected = False  # 可用于控制线程运行的标志
         self.is_flying = False  # 是否正在飞行
 
@@ -67,6 +69,13 @@ class DroneEnvWrapper:
             img_png = np.frombuffer(client.simGetImage("0", airsim.ImageType.Scene), dtype=np.uint8)
             try:
                 img_bgr = cv2.imdecode(img_png, cv2.IMREAD_COLOR)
+
+                # 生成高斯噪声
+                if self.image_noise:
+                    noise = np.random.normal(0, self.image_noise_var, img_bgr.shape).astype(np.float32)
+                    img_bgr_normal = (img_bgr.astype(np.float32) / 255.) * 2 - 1  # (-1, 1)
+                    noisy_image = np.clip(img_bgr_normal + noise, -1.0, 1.0)
+                    img_bgr = ((noisy_image + 1.) / 2. * 255.).astype(np.uint8)
                 # img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
                 x, y, w, h = self.target_xywh
@@ -205,6 +214,13 @@ class DroneEnvWrapper:
         self.episode_reward += reward
         self.episode_final_reward += final_reward
 
+        # 生成高斯噪声
+        if self.image_noise:
+            noise = np.random.normal(0, self.image_noise_var, state.shape).astype(np.float32)
+            state_normal = (state.astype(np.float32) / 255.) * 2 - 1  # (-1, 1)
+            noisy_image = np.clip(state_normal + noise, -1.0, 1.0)
+            state = ((noisy_image + 1.) / 2. * 255.).astype(np.uint8)
+
         return state, reward, done, successful
 
     def reset(self):
@@ -223,9 +239,9 @@ class DroneEnvWrapper:
         # max_position_offset_z = 5.
 
         # 10m
-        # max_position_offset_x = 0.
-        # max_position_offset_y = 8.
-        # max_position_offset_z = 5.
+        max_position_offset_x = 0.
+        max_position_offset_y = 8.
+        max_position_offset_z = 5.
 
         # 15m
         # max_position_offset_x = 0.
@@ -233,9 +249,9 @@ class DroneEnvWrapper:
         # max_position_offset_z = 8.
 
         # 20m
-        max_position_offset_x = 0.
-        max_position_offset_y = 15.
-        max_position_offset_z = 10.
+        # max_position_offset_x = 0.
+        # max_position_offset_y = 15.
+        # max_position_offset_z = 10.
 
         # 25m
         # max_position_offset_x = 0.
@@ -250,7 +266,7 @@ class DroneEnvWrapper:
 
         # target起始点
         # target_pose = self.client.simGetObjectPose("target")
-        self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(20., 0., 0.),
+        self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(12., 0., 0.),
                                              orientation_val=airsim.Quaternionr(0., 0., 0., 1.))
         self.client.simSetObjectPose("target", self.target_start_pose)
         max_target_position_offset = 0.0
@@ -276,6 +292,13 @@ class DroneEnvWrapper:
         img_bgr = cv2.imdecode(img_png, cv2.IMREAD_COLOR)
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
         state = img_rgb
+
+        # 生成高斯噪声
+        if self.image_noise:
+            noise = np.random.normal(0, self.image_noise_var, state.shape).astype(np.float32)
+            state_normal = (state.astype(np.float32) / 255.) * 2 - 1  # (-1, 1)
+            noisy_image = np.clip(state_normal + noise, -1.0, 1.0)
+            state = ((noisy_image + 1.) / 2. * 255.).astype(np.uint8)
 
         return state
 

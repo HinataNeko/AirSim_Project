@@ -5,13 +5,13 @@ import numpy as np
 
 from EnvWrapper_Image import DroneEnvWrapper
 # from cnn_ncps_model import Model
-from evaluation.cnn_rnn_model import Model
+# from evaluation.cnn_rnn_model import Model
 # from evaluation.cnn_lstm_model import Model
 # from evaluation.cnn_gru_model import Model
-# from snn.cnn_srnn_model import Model
+from snn.cnn_srnn_model import Model
 
 if __name__ == '__main__':
-    env_wrapper = DroneEnvWrapper(render=True)
+    env_wrapper = DroneEnvWrapper(render=True, image_noise=True)
     model = Model(load_dataset=False)  # 导航控制模型
     model.load()
 

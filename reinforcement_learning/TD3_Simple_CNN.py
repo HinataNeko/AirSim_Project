@@ -11,7 +11,7 @@ import numpy as np
 from EnvWrapper_Simple_CNN import DroneEnvWrapper
 
 NAME = 'TD3_Simple_CNN'
-MODE = 'train'
+MODE = 'test'
 
 state_dim = 128
 action_dim = 4
@@ -25,7 +25,7 @@ MEMORY_CAPACITY = 500000  # size of replay buffer
 BATCH_SIZE = 256  # update batch_size
 
 MAX_EPISODES = 1000  # total number of episodes for training
-MAX_EP_STEPS = 300  # total number of steps for each episode
+MAX_EP_STEPS = 400  # total number of steps for each episode
 EXPLORE_EPISODES = 0  # for random action sampling in the beginning of training
 UPDATE_ITR = 2  # repeated updates for each step
 POLICY_UPDATE_FREQ = 4  # 策略网络更新频率
@@ -402,7 +402,7 @@ class TD3:
 
 
 if __name__ == '__main__':
-    env_wrapper = DroneEnvWrapper(render=False)
+    env_wrapper = DroneEnvWrapper(render=True)
 
     # initialization of trainer
     td3 = TD3(state_dim=state_dim, action_dim=action_dim)
@@ -507,23 +507,33 @@ if __name__ == '__main__':
         td3.q_net2_target.eval()
         td3.actor_target.eval()
 
-        for i in range(20):
+        n_test = 100
+        n_successful = 0
+        n = 0
+
+        while n < n_test:
             t1 = time.time()
             step = 0
             state = env_wrapper.reset()
+            if state is None:
+                continue
 
             for _ in range(2 * MAX_EP_STEPS):
                 action = td3.actor.get_action(state, explore_noise_scale=0)
-                next_state, reward, done = env_wrapper.step(action)
+                next_state, reward, done, successful = env_wrapper.step(action)
 
                 state = next_state
                 step += 1
                 if done:
+                    if successful:
+                        n_successful += 1
                     break
 
             # 异常episode
             if step < 15:
                 continue
+
+            n += 1
             print('\rEpisode: {} | '
                   'Episode Reward: {:.4f} | '
                   'Distance Reward: {:.4f} | '
@@ -531,9 +541,11 @@ if __name__ == '__main__':
                   'Final Reward: {:.4f} | '
                   'Step: {} | '
                   'Running Time: {:.2f}'
-                  .format(i,
+                  .format(n,
                           env_wrapper.episode_reward,
                           env_wrapper.episode_distance_reward,
                           env_wrapper.episode_detection_reward,
                           env_wrapper.episode_final_reward,
                           step, time.time() - t1))
+
+        print(f"Successful rate: {n_successful}/{n_test}={n_successful / n_test}")

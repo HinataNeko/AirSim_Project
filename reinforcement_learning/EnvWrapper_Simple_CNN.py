@@ -125,7 +125,8 @@ class DroneEnvWrapper:
             detection_reward = - abs(self.target_xywh[0] - 0.5) - abs(self.target_xywh[1] - 0.5)  # (-1, 0)
             # detection_reward += self.target_xywh[2] * self.target_xywh[3]
             # detection_reward *= 0.5
-            return detection_reward
+            detection_reward += 0.1
+            return 0 if detection_reward > 0 else detection_reward
 
         # action: np.ndarray, 顺序(roll, pitch, thrust, yaw)
         roll, pitch, thrust, yaw = action.tolist()
@@ -153,6 +154,7 @@ class DroneEnvWrapper:
         reward = -0.1
         final_reward = 0.
         done = False
+        successful = False
 
         # 目标在视野内
         if len(detection) > 0:
@@ -166,6 +168,7 @@ class DroneEnvWrapper:
             if self.distance < 3.5:
                 final_reward += 50. * (detection_reward + 1)
                 done = True
+                successful = True
                 print("Completed!")
                 # distance_reward = -2 * distance_reward
                 # detection_reward *= 2
@@ -211,7 +214,7 @@ class DroneEnvWrapper:
         with torch.no_grad():
             state = self.cnn_model(torch.tensor(img_float).unsqueeze(0).to(self.device))[0].cpu().numpy()
 
-        return state, reward, done
+        return state, reward, done, successful
 
     def reset(self):
         self.client.simPause(False)
@@ -223,9 +226,31 @@ class DroneEnvWrapper:
         self.client.moveByVelocityBodyFrameAsync(vx=0, vy=0, vz=0, duration=0.02).join()
 
         # agent起始点随机偏移
-        max_position_offset_x = 3.
-        max_position_offset_y = 8.
-        max_position_offset_z = 5.
+        # 10~15m
+        # max_position_offset_x = 3.
+        # max_position_offset_y = 8.
+        # max_position_offset_z = 5.
+
+        # 10m
+        # max_position_offset_x = 0.
+        # max_position_offset_y = 8.
+        # max_position_offset_z = 5.
+
+        # 15m
+        max_position_offset_x = 0.
+        max_position_offset_y = 12.
+        max_position_offset_z = 8.
+
+        # 20m
+        # max_position_offset_x = 0.
+        # max_position_offset_y = 15.
+        # max_position_offset_z = 10.
+
+        # 25m
+        # max_position_offset_x = 0.
+        # max_position_offset_y = 18.
+        # max_position_offset_z = 12.
+
         random_position = airsim.Pose(airsim.Vector3r(
             random.uniform(-max_position_offset_x, max_position_offset_x),
             random.uniform(-max_position_offset_y, max_position_offset_y),
@@ -234,7 +259,7 @@ class DroneEnvWrapper:
 
         # 设置目标距离与随机移动
         # self.target_pose = self.client.simGetObjectPose("target")
-        self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(12, 0., 0.),
+        self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(15, 0., 0.),
                                              orientation_val=airsim.Quaternionr(0., 0., 0., 1.))
         self.client.simSetObjectPose("target", self.target_start_pose)
         max_target_position_offset = 0.025
@@ -244,8 +269,8 @@ class DroneEnvWrapper:
             random.uniform(-max_target_position_offset, max_target_position_offset))
 
         # 设置随机风
-        wind_speed = random.uniform(0, 10) # 风速
-        wind_angle = random.uniform(0, 2 * math.pi) # 风向
+        wind_speed = random.uniform(0, 10)  # 风速
+        wind_angle = random.uniform(0, 2 * math.pi)  # 风向
         wind_x = wind_speed * math.cos(wind_angle)  # x轴风速
         wind_y = wind_speed * math.sin(wind_angle)  # y轴风速
         wind = airsim.Vector3r(wind_x, wind_y, 0)  # z轴风速设置为0
