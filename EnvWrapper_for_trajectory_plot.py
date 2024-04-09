@@ -181,9 +181,9 @@ class DroneEnvWrapper:
         # max_position_offset_z = 8.
 
         # 20m
-        max_position_offset_x = 0.
-        max_position_offset_y = 15.
-        max_position_offset_z = 10.
+        # max_position_offset_x = 0.
+        # max_position_offset_y = 15.
+        # max_position_offset_z = 10.
 
         # 25m
         # max_position_offset_x = 0.

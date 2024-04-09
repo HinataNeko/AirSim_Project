@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms.functional import to_pil_image
 from torchcam.methods import SmoothGradCAMpp
@@ -260,23 +261,82 @@ class Model:
                 # 显示图像
                 cv2.imshow('Combined Image', cv2.resize(combined_img, (width, height)))
                 cv2.waitKey(1)  # 等待毫秒
+    def register_hook(self):
+        def hook_fn(module, input, output):
+            # 保存ReLU激活后的特征图
+            self.feature_maps.append(output)
 
-    def get_salient_map(self, rgb_img):
-        input_img = torch.tensor(rgb_img.astype(np.float32) / 255.).permute((2, 0, 1))  # (channels, height, width)
-        self.model.eval()
+        # 注册hook
+        self.hooks = []  # 用于保存钩子句柄
+        self.feature_maps = []
+        for layer in self.model.cnn.cnn:
+            if isinstance(layer, nn.ReLU):
+                layer.register_forward_hook(hook_fn)
 
-        with SmoothGradCAMpp(self.model.cnn, input_shape=self.input_shape) as cam_extractor:
-            # Preprocess your data and feed it to the model
-            out = self.model.cnn(input_img.unsqueeze(0).to(self.device))
-            # Retrieve the CAM by passing the class index and the model output
-            activation_map = cam_extractor(out.squeeze(0).argmax().item(), out)
+    def remove_hooks(self):
+        # 遍历所有句柄并移除钩子
+        for hook in self.hooks:
+            hook.remove()
+        # 清空句柄列表
+        self.hooks = []
+    def get_salient_map(self, rgb_img, transform=True, combine=True):
+        """
+        if transform=True, rgb_img: (240, 320, 3), np.uint8
+        if transform=False, rgb_img: (3, 240, 320), torch.float32
+        """
 
-            # Resize the CAM and overlay it
-            result = overlay_mask(to_pil_image(input_img), to_pil_image(activation_map[0].squeeze(0), mode='F'),
-                                  alpha=0.5)
-            salient_map = np.array(result)  # RGB type
+        def visual_backprop(x):  # x: (3, 240, 320), torch.float32
+            self.feature_maps = []
 
-        return salient_map
+            # 前向传播，获取特征图
+            self.model.cnn.cnn(x.unsqueeze(0).to(self.device))
+
+            # 反转特征图列表，以便从最深层开始处理
+            self.feature_maps.reverse()
+
+            # 初始化遮罩为最后一个特征图的平均值
+            mask = torch.mean(self.feature_maps[0], dim=1, keepdim=True)
+            for i in range(1, len(self.feature_maps)):
+                # 上采样遮罩
+                mask = F.interpolate(mask, size=self.feature_maps[i].size()[2:], mode='nearest')
+
+                # 乘以当前层的平均特征图
+                mask *= torch.mean(self.feature_maps[i], dim=1, keepdim=True)
+
+            # 上采样遮罩到原始输入图像大小
+            mask = F.interpolate(mask, size=x.size()[1:], mode='bilinear', align_corners=False)
+
+            # 归一化遮罩
+            mask = (mask - mask.min()) / (mask.max() - mask.min())
+
+            return mask.squeeze()
+
+        if transform:
+            input_img = torch.tensor(rgb_img.astype(np.float32) / 255.).permute((2, 0, 1))  # (3, 240, 320)
+        else:
+            input_img = rgb_img
+        mask = visual_backprop(input_img)
+        # 现在，mask包含了输入图像每个像素的贡献度
+
+        mask_np = mask.cpu().detach().numpy()  # 将形状转换为 (240, 320)
+
+        if transform:
+            image_np = rgb_img  # (240, 320, 3)
+        else:
+            image_np = (rgb_img.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)  # 将形状转换为 (240, 320, 3)
+
+        mask_np = (mask_np * 255).astype(np.uint8)
+        # image_np = (image_np * 255).astype(np.uint8)
+
+        # 将遮罩转换为彩色图像以便可视化
+        mask_color = cv2.applyColorMap(mask_np, cv2.COLORMAP_JET)
+
+        if combine:
+            # 垂直堆叠原始图像和遮罩
+            combined_image = cv2.vconcat([cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR), mask_color])
+            return combined_image  # BGR format
+        else:
+            return mask_color
 
 
 if __name__ == '__main__':

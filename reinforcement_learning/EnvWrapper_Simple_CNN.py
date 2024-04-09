@@ -160,7 +160,6 @@ class DroneEnvWrapper:
         if len(detection) > 0:
             self.target_xywh = self.get_target_xywh(detection[0])
 
-            # 距离奖励
             distance_reward = get_distance_reward()
             detection_reward = get_detection_reward()
 

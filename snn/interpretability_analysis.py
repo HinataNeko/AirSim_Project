@@ -324,7 +324,7 @@ def run_trajectory_with_spike_rate_heatmap_3d():
             break
 
     position_array = np.array(position_list)
-    position_array[:, -1] = -position_array[:, -1]
+    position_array[:, -1] = -position_array[:, -1]  # 反转z轴
     all_spike_rate1 = torch.stack(all_spike_rate1, dim=1).squeeze(2)  # (T, N, hidden), N为所有图像数
     all_spike_rate1 = torch.mean(all_spike_rate1, dim=0).cpu().numpy()  # (N, hidden), N为所有图像数
 

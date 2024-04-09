@@ -1,10 +1,9 @@
 import threading
 import cv2
 import numpy as np
-from pynput import keyboard
-import datetime
 import os
 import time
+import math
 import random
 import airsim
 import torch
@@ -13,30 +12,21 @@ from cnn_ncps_model import Model
 
 
 class DroneEnvWrapper:
-    def __init__(self):
-        self.active_keys = set()
-        self.move_keys = {'w', 'a', 's', 'd',
-                          keyboard.Key.up, keyboard.Key.down, keyboard.Key.left, keyboard.Key.right}
-        self.control_keys = {'c',  # close
-                             't',  # take off
-                             'l',  # land
-                             'p',  # reset
-                             }
-        self.valid_keys = self.move_keys | self.control_keys
-
+    def __init__(self, render=True):
         self.camera_width = 320
         self.camera_height = 240
         self.state_keep_n = 3
         self.speed = 2.
         self.time_step = 0.05
 
+        self.render = render
         self.is_connected = False  # 可用于控制线程运行的标志
         self.is_flying = False  # 是否正在飞行
 
         self.video_thread = None
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.model = Model()  # 导航控制模型
+        self.model = Model(load_dataset=False)  # 导航控制模型
         self.model.load()
         self.cnn_model = self.model.model.cnn
         self.cnn_model.eval()
@@ -54,11 +44,12 @@ class DroneEnvWrapper:
             return  # 如果已经连接，则不重复执行以下操作
 
         self.client.simGetImage("0", airsim.ImageType.Scene)
-        # if self.video_thread is None or not self.video_thread.is_alive():
-        #     client1 = airsim.MultirotorClient()  # connect to the AirSim simulator
-        #
-        #     self.video_thread = threading.Thread(target=self._video_stream, args=(client1,))
-        #     self.video_thread.start()
+        if self.render:
+            if self.video_thread is None or not self.video_thread.is_alive():
+                client1 = airsim.MultirotorClient()  # connect to the AirSim simulator
+
+                self.video_thread = threading.Thread(target=self._video_stream, args=(client1,))
+                self.video_thread.start()
 
         self.is_connected = True
 
@@ -93,85 +84,6 @@ class DroneEnvWrapper:
             cv2.imshow('Camera', img_bgr)
             cv2.waitKey(1)
 
-    def _on_press(self, key):
-        key_to_check = key.char if hasattr(key, 'char') else key
-        if key_to_check in self.valid_keys:
-            if hasattr(key, 'char'):
-                self.active_keys.add(key.char)
-            else:
-                self.active_keys.add(key)
-
-            if key_to_check in self.move_keys:
-                self.keyboard_move()
-            if key_to_check in self.control_keys:
-                self.keyboard_control()
-
-    def _on_release(self, key):
-        key_to_check = key.char if hasattr(key, 'char') else key
-        if key_to_check in self.valid_keys:
-            if hasattr(key, 'char'):
-                self.active_keys.discard(key.char)
-            else:
-                self.active_keys.discard(key)
-
-            if key_to_check in self.move_keys:
-                self.keyboard_move()
-            if key_to_check in self.control_keys:
-                self.keyboard_control()
-
-    def keyboard_move(self):
-        self.roll = self.pitch = self.thrust = self.yaw = 0
-        det = 1.
-
-        if 'w' in self.active_keys:
-            self.pitch = det  # 增加俯仰
-        if 's' in self.active_keys:
-            self.pitch = -det  # 减少俯仰
-        if 'a' in self.active_keys:
-            self.roll = -det  # 增加横滚
-        if 'd' in self.active_keys:
-            self.roll = det  # 减少横滚
-
-        # 检查特殊按键
-        if keyboard.Key.up in self.active_keys:
-            self.thrust = det  # 增加油门
-        if keyboard.Key.down in self.active_keys:
-            self.thrust = -det  # 减少油门
-        if keyboard.Key.left in self.active_keys:
-            self.yaw = -det  # 增加偏航
-        if keyboard.Key.right in self.active_keys:
-            self.yaw = det  # 减少偏航
-
-        if self.is_flying:
-            self.move()
-
-    def keyboard_control(self):
-        if 'c' in self.active_keys:
-            self.close()
-            return
-        elif 't' in self.active_keys:
-            self.take_off()
-            self.active_keys.discard('t')
-            return
-        elif 'l' in self.active_keys:
-            self.land()
-            self.active_keys.discard('l')
-            return
-        elif 'p' in self.active_keys:
-            self.reset()
-            return
-
-    def start_keyboard_listener(self):
-        with keyboard.Listener(on_press=self._on_press, on_release=self._on_release) as listener:
-            while self.is_connected:
-                listener.join(0.1)
-            listener.stop()
-
-    def move(self):
-        self.client.moveByVelocityBodyFrameAsync(
-            vx=self.pitch * self.speed, vy=self.roll * self.speed, vz=-self.thrust, duration=60,
-            yaw_mode=airsim.YawMode(is_rate=True, yaw_or_rate=self.yaw * 30.))
-
     def take_off(self):
         if not self.is_connected:
             return
@@ -205,18 +117,13 @@ class DroneEnvWrapper:
     def step(self, action):
         # 距离奖励
         def get_distance_reward():
-            distance_reward = (old_distance - self.distance) * 0.1 / self.time_step
-            if distance_reward < 0:
-                distance_reward *= 2
-            distance_reward += self.target_xywh[2] * self.target_xywh[3]
+            distance_reward = (old_distance - self.distance) * 0.2 / self.time_step
             return distance_reward
 
         def get_detection_reward():
-            detection_reward = 0.5 - abs(self.target_xywh[0] - 0.5) - abs(self.target_xywh[1] - 0.5)  # (-0.5, 0.5)
-            detection_reward *= 0.4
-            # print(detection_reward)
-
-            return detection_reward
+            detection_reward = - abs(self.target_xywh[0] - 0.5) - abs(self.target_xywh[1] - 0.5)  # (-1, 0)
+            detection_reward += 0.05
+            return 0 if detection_reward > 0 else detection_reward
 
         # action: np.ndarray, 顺序(roll, pitch, thrust, yaw)
         roll, pitch, thrust, yaw = action.tolist()
@@ -244,41 +151,43 @@ class DroneEnvWrapper:
         reward = -0.1
         final_reward = 0.
         done = False
+        successful = False
 
         # 目标在视野内
         if len(detection) > 0:
             self.target_xywh = self.get_target_xywh(detection[0])
 
-            # 距离奖励
             distance_reward = get_distance_reward()
             detection_reward = get_detection_reward()
-            reward += distance_reward + detection_reward
-
-            self.episode_distance_reward += distance_reward
-            self.episode_detection_reward += detection_reward
 
             # 结束
             if self.distance < 3.5:
-                if detection_reward > 0:
-                    final_reward += 100. * 5 * detection_reward
-                # reward += 100.
+                final_reward += 50. * (detection_reward + 1)
                 done = True
+                successful = True
                 print("Completed!")
+
+            reward += distance_reward + detection_reward
+            self.episode_distance_reward += distance_reward
+            self.episode_detection_reward += detection_reward
         else:  # 目标在视野外
-            final_reward += -50. if self.distance > 10 else -25.
+            final_reward += -50. if self.distance > 8 else -25.
             done = True
             print("The target moved out of the camera's field of view")
 
         is_collided = self.client.simGetCollisionInfo().has_collided
         if is_collided:
-            final_reward -= 1.
+            if self.distance < 3.5:  # 与目标发生碰撞
+                final_reward -= 10
+                print("Collided with target!")
+            else:
+                final_reward -= 25
+                print("Collided with other objects!")
             done = True
-            print("Collided!")
 
-        # print(f"distance_reward: {distance_reward}\tdetection_reward: {detection_reward}\treward: {reward}")
         reward += final_reward
-        self.episode_reward += reward
         self.episode_final_reward += final_reward
+        self.episode_reward += reward
 
         img_png = np.frombuffer(self.client.simGetImage("0", airsim.ImageType.Scene), dtype=np.uint8)
         img_bgr = cv2.imdecode(img_png, cv2.IMREAD_COLOR)
@@ -290,7 +199,7 @@ class DroneEnvWrapper:
         self.state_stack.append(hidden_state)
         state = np.array(self.state_stack)
 
-        return state, reward, done
+        return state, reward, done, successful
 
     def reset(self):
         self.client.simPause(False)
@@ -299,33 +208,70 @@ class DroneEnvWrapper:
         self.client.armDisarm(True)  # 解锁
         self.client.takeoffAsync()
         self.client.hoverAsync()
+        self.client.moveByVelocityBodyFrameAsync(vx=0, vy=0, vz=0, duration=0.02).join()
 
         # agent起始点随机偏移
-        max_position_offset_x = 3.
-        max_position_offset_y = 8.
-        max_position_offset_z = 5.
+        # 10~15m
+        # max_position_offset_x = 3.
+        # max_position_offset_y = 8.
+        # max_position_offset_z = 5.
+
+        # 10m
+        # max_position_offset_x = 0.
+        # max_position_offset_y = 8.
+        # max_position_offset_z = 5.
+
+        # 15m
+        max_position_offset_x = 0.
+        max_position_offset_y = 12.
+        max_position_offset_z = 8.
+
+        # 20m
+        # max_position_offset_x = 0.
+        # max_position_offset_y = 15.
+        # max_position_offset_z = 10.
+
+        # 25m
+        # max_position_offset_x = 0.
+        # max_position_offset_y = 18.
+        # max_position_offset_z = 12.
+
         random_position = airsim.Pose(airsim.Vector3r(
             random.uniform(-max_position_offset_x, max_position_offset_x),
             random.uniform(-max_position_offset_y, max_position_offset_y),
             random.uniform(-max_position_offset_z, max_position_offset_z)))
         self.client.simSetVehiclePose(random_position, ignore_collision=True)
 
-        # target起始点
+        # 设置目标距离与随机移动
         # self.target_pose = self.client.simGetObjectPose("target")
-        self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(12., 0., 0.),
+        self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(15, 0., 0.),
                                              orientation_val=airsim.Quaternionr(0., 0., 0., 1.))
         self.client.simSetObjectPose("target", self.target_start_pose)
-        max_target_position_offset = 0.01
+        max_target_position_offset = 0.05
+        # max_target_position_offset = random.uniform(0, 0.05)
         self.target_pose_random_offset = airsim.Vector3r(
             random.uniform(-max_target_position_offset, max_target_position_offset),
             random.uniform(-max_target_position_offset, max_target_position_offset),
             random.uniform(-max_target_position_offset, max_target_position_offset))
 
+        # 设置随机风
+        max_wind_speed = 10
+        wind_speed = random.uniform(0, max_wind_speed)  # 风速
+        # wind_speed = 0
+        wind_angle = random.uniform(0, 2 * math.pi)  # 风向
+        wind_x = wind_speed * math.cos(wind_angle)  # x轴风速
+        wind_y = wind_speed * math.sin(wind_angle)  # y轴风速
+        wind = airsim.Vector3r(wind_x, wind_y, 0)  # z轴风速设置为0
+        self.client.simSetWind(wind)
+
+        # 重置初始奖励
         self.episode_reward = 0.
         self.episode_distance_reward = 0.
         self.episode_detection_reward = 0.
         self.episode_final_reward = 0.
+        self.stay_in_range_count = 0
 
+        # 重置初始位置
         self.target_pose = self.client.simGetObjectPose("target")
         self.target_position = self.target_pose.position
         self.target_orientation = self.target_pose.orientation
@@ -374,10 +320,6 @@ class DroneEnvWrapper:
 
         self.connect()
 
-        # keyboard_thread = threading.Thread(target=self.start_keyboard_listener)
-        # keyboard_thread.start()
-
 
 if __name__ == "__main__":
     drone = DroneEnvWrapper()
-    drone.main()

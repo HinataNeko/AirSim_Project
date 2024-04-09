@@ -238,7 +238,7 @@ class Model:
         # 清空句柄列表
         self.hooks = []
 
-    def get_salient_map(self, rgb_img, transform=True):
+    def get_salient_map(self, rgb_img, transform=True, combine=True):
         """
         if transform=True, rgb_img: (240, 320, 3), np.uint8
         if transform=False, rgb_img: (3, 240, 320), torch.float32
@@ -290,10 +290,12 @@ class Model:
         # 将遮罩转换为彩色图像以便可视化
         mask_color = cv2.applyColorMap(mask_np, cv2.COLORMAP_JET)
 
-        # 垂直堆叠原始图像和遮罩
-        combined_image = cv2.vconcat([cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR), mask_color])
-
-        return combined_image  # BGR format
+        if combine:
+            # 垂直堆叠原始图像和遮罩
+            combined_image = cv2.vconcat([cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR), mask_color])
+            return combined_image  # BGR format
+        else:
+            return mask_color
 
 
 if __name__ == '__main__':

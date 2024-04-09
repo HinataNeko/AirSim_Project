@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from ncps.torch import CfC
+from spikingjelly import visualizing
+from spikingjelly.activation_based import neuron, encoding, functional, surrogate, layer, monitor
 
 import time
 import os
@@ -11,7 +12,7 @@ import numpy as np
 
 from EnvWrapper_Simple_CNN_RNN import DroneEnvWrapper
 
-NAME = 'TD3_Simple_CNN_CfC'
+NAME = 'TD3_Simple_CNN_SRNN'
 MODE = 'train'
 
 state_dim = 128
@@ -24,9 +25,9 @@ GAMMA = 0.99  # reward discount
 TAU = 0.005  # soft replacement
 
 MEMORY_CAPACITY = 1000000  # size of replay buffer
-BATCH_SIZE = 512  # update batch_size
+BATCH_SIZE = 256  # update batch_size
 
-MAX_EPISODES = 199  # total number of episodes for training
+MAX_EPISODES = 500  # total number of episodes for training
 MAX_EP_STEPS = 400  # total number of steps for each episode
 EXPLORE_EPISODES = 0  # for random action sampling in the beginning of training
 UPDATE_ITR = 2  # repeated updates for each step
@@ -174,6 +175,56 @@ class DoubleReplayBuffer:
         return len(self.good_replay_buffer) + len(self.bad_replay_buffer)
 
 
+class SpikingRNNBase(nn.Module):
+    def __init__(self, input_size, hidden_size, v_threshold: float = 1.):
+        super(SpikingRNNBase, self).__init__()
+        self.i2h = layer.Linear(input_size, hidden_size, step_mode='m')
+        self.h2h = layer.Linear(hidden_size, hidden_size, step_mode='m')
+        self.lif_layer = neuron.LIFNode(v_threshold=v_threshold, step_mode='m')
+
+    def forward(self, input, hidden):  # (T, batch_size, hidden)
+        # 输入到隐藏状态的线性变换
+        input_hidden = self.i2h(input)
+        # 隐藏状态到隐藏状态的线性变换
+        hidden_hidden = self.h2h(hidden)
+        # 应用激活函数并更新隐藏状态
+        next_hidden = self.lif_layer(input_hidden + hidden_hidden)
+        return next_hidden
+
+
+class SpikingRNN(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super(SpikingRNN, self).__init__()
+        self.rnn1 = SpikingRNNBase(input_size, hidden_size)
+        self.rnn2 = SpikingRNNBase(hidden_size, hidden_size, v_threshold=999.)
+
+    def forward(self, input, hidden):
+        """
+        input: (T, batch_size, frames, hidden)
+        hidden: (num_layers, T, batch_size, hidden)
+        """
+        frames = input.shape[2]
+
+        h1 = hidden[0]  # (T, batch_size, hidden)
+        rnn1_hidden_list = []
+        for frame in range(frames):
+            h1 = self.rnn1(input[:, :, frame], h1)  # (T, batch_size, hidden)
+            rnn1_hidden_list.append(h1)
+            functional.reset_net(self.rnn1)
+
+        rnn1_output_hidden = torch.stack(rnn1_hidden_list, dim=2)  # (T, batch_size, frames, hidden)
+
+        h2 = hidden[1]  # (T, batch_size, hidden)
+        v_list = []
+        for frame in range(frames):
+            h2 = self.rnn2(rnn1_output_hidden[:, :, frame], h2)  # (T, batch_size, hidden)
+            v_list.append(self.rnn2.lif_layer.v)  # 最后一层膜电位，(batch_size, hidden)
+            functional.reset_net(self.rnn2)
+
+        rnn_output_v = torch.stack(v_list, dim=1)  # (batch_size, frames, hidden)
+        return rnn_output_v, torch.stack([h1, h2], dim=0)
+
+
 class QNetwork(nn.Module):
     """ the network for evaluating values of state-action pairs: Q(s,a) in PyTorch using nn.Sequential """
 
@@ -184,8 +235,9 @@ class QNetwork(nn.Module):
         self.action_dim = action_dim
         self.hidden_dim = hidden_dim
         self.rnn_layers = 2
+        self.T = 4
 
-        self.rnn = CfC(self.state_dim, self.hidden_dim, batch_first=True)
+        self.srnn = SpikingRNN(input_size=self.state_dim, hidden_size=self.hidden_dim)
 
         # Fully connected layers
         self.fc = nn.Sequential(
@@ -203,8 +255,9 @@ class QNetwork(nn.Module):
 
     def forward(self, state, action):
         current_batch_size = state.shape[0]
-        h_0 = torch.zeros(current_batch_size, self.hidden_dim).to(self.device)
-        rnn_output, _ = self.rnn(state, h_0)  # rnn_output: (batch_size, time_seq, hidden_size)
+        rnn_input = state.unsqueeze(0).repeat(self.T, *([1] * state.dim()))  # (T, batch_size, frames, hidden)
+        h_0 = torch.zeros(self.rnn_layers, self.T, current_batch_size, self.hidden_dim).to(self.device)
+        rnn_output, _ = self.srnn(rnn_input, h_0)  # rnn_output: (batch_size, time_seq, hidden_size)
 
         x = torch.cat([rnn_output[:, -1], action], dim=1)
         return self.fc(x)
@@ -220,8 +273,9 @@ class ActorNetwork(nn.Module):
         self.action_dim = action_dim
         self.hidden_dim = hidden_dim
         self.rnn_layers = 2
+        self.T = 4
 
-        self.rnn = CfC(self.state_dim, self.hidden_dim, batch_first=True)
+        self.srnn = SpikingRNN(input_size=self.state_dim, hidden_size=self.hidden_dim)
 
         self.fc = nn.Sequential(
             nn.Linear(hidden_dim, action_dim),
@@ -237,8 +291,9 @@ class ActorNetwork(nn.Module):
 
     def forward(self, state):
         current_batch_size = state.shape[0]
-        h_0 = torch.zeros(current_batch_size, self.hidden_dim).to(self.device)
-        rnn_output, _ = self.rnn(state, h_0)  # rnn_output: (batch_size, time_seq, hidden_size)
+        rnn_input = state.unsqueeze(0).repeat(self.T, *([1] * state.dim()))  # (T, batch_size, frames, hidden)
+        h_0 = torch.zeros(self.rnn_layers, self.T, current_batch_size, self.hidden_dim).to(self.device)
+        rnn_output, _ = self.srnn(rnn_input, h_0)  # rnn_output: (batch_size, time_seq, hidden_size)
 
         normal_action = self.fc(rnn_output[:, -1])
         return normal_action

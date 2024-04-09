@@ -4,6 +4,7 @@ import numpy as np
 from pynput import keyboard
 import os
 import time
+import math
 import random
 import airsim
 import torch
@@ -26,7 +27,7 @@ class DroneEnvWrapper:
         self.camera_height = 240
         self.speed = 2.
         self.time_step = 0.05
-        self.image_noise_var = 0.5
+        self.image_noise_var = 0.0
 
         self.render = render
         self.image_noise = image_noise
@@ -239,14 +240,14 @@ class DroneEnvWrapper:
         # max_position_offset_z = 5.
 
         # 10m
-        max_position_offset_x = 0.
-        max_position_offset_y = 8.
-        max_position_offset_z = 5.
+        # max_position_offset_x = 0.
+        # max_position_offset_y = 8.
+        # max_position_offset_z = 5.
 
         # 15m
-        # max_position_offset_x = 0.
-        # max_position_offset_y = 12.
-        # max_position_offset_z = 8.
+        max_position_offset_x = 0.
+        max_position_offset_y = 12.
+        max_position_offset_z = 8.
 
         # 20m
         # max_position_offset_x = 0.
@@ -264,16 +265,27 @@ class DroneEnvWrapper:
             random.uniform(-max_position_offset_z, max_position_offset_z)))
         self.client.simSetVehiclePose(random_position, ignore_collision=True)
 
-        # target起始点
+        # 设置目标距离与随机移动
         # target_pose = self.client.simGetObjectPose("target")
-        self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(12., 0., 0.),
+        self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(15., 0., 0.),
                                              orientation_val=airsim.Quaternionr(0., 0., 0., 1.))
         self.client.simSetObjectPose("target", self.target_start_pose)
         max_target_position_offset = 0.0
+        # max_target_position_offset = random.uniform(0, 0.05)
         self.target_pose_random_offset = airsim.Vector3r(
             random.uniform(-max_target_position_offset, max_target_position_offset),
             random.uniform(-max_target_position_offset, max_target_position_offset),
             random.uniform(-max_target_position_offset, max_target_position_offset))
+
+        # 设置随机风
+        # max_wind_speed = 10
+        # wind_speed = random.uniform(0, max_wind_speed)  # 风速
+        wind_speed = 0
+        wind_angle = random.uniform(0, 2 * math.pi)  # 风向
+        wind_x = wind_speed * math.cos(wind_angle)  # x轴风速
+        wind_y = wind_speed * math.sin(wind_angle)  # y轴风速
+        wind = airsim.Vector3r(wind_x, wind_y, 0)  # z轴风速设置为0
+        self.client.simSetWind(wind)
 
         self.episode_reward = 0.
         self.episode_distance_reward = 0.

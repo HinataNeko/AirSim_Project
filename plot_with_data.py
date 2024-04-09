@@ -74,10 +74,10 @@ def plot_navigation_success_rate_by_distance_on_different_models():
     # 数据
     distances = [10, 15, 20, 25]  # 初始距离
     success_rates = {
-        'Naive RNN': [100, 85.33, 45, 36],
-        'LSTM': [98.67, 82, 54.66, 42],
-        'GRU': [96.67, 79.33, 47.33, 36.66],
-        'SRNN': [100, 99.33, 98, 87.33],
+        'CNN-NaiveRNN': [100, 85.33, 45, 36],
+        'CNN-LSTM': [98.67, 82, 54.66, 42],
+        'CNN-GRU': [96.67, 79.33, 47.33, 36.66],
+        'CNN-SRNN': [100, 99.33, 98, 87.33],
     }
 
     # 设置图表样式
@@ -105,7 +105,38 @@ def plot_navigation_success_rate_by_distance_on_different_models():
     plt.show()
 
 
+def plot_navigation_success_rate_by_noise_on_different_models():
+    # 数据
+    distances = [0, 0.2, 0.3, 0.4, 0.5]  # 初始距离
+    success_rates = {
+        'CNN-NaiveRNN': [98, 94, 90, 79, 61],
+        'CNN-LSTM': [97, 95, 92, 76, 64],
+        'CNN-GRU': [96, 92, 89, 74, 59],
+        'CNN-SRNN': [99, 97, 96, 92, 85],
+    }
+
+    # 设置图表样式
+    plt.figure(figsize=(5, 4))
+    markers = ['o', 's', '^', 'D']  # 不同标记
+    colors = plt.cm.viridis(np.linspace(1, 0, len(success_rates)))  # 颜色渐变
+
+    # 绘制每条折线
+    for (model, rates), marker, color in zip(success_rates.items(), markers, colors):
+        plt.plot(distances, rates, marker=marker, linestyle='-', linewidth=2, color=color, label=model)
+
+    plt.title('Navigation Success Rate by Noise Var across Different Models', fontsize=14)
+    plt.xlabel('Initial Distance (m)', fontsize=12)
+    plt.ylabel('Noise Var', fontsize=12)
+    plt.legend(title='Models', fontsize=10)
+    plt.grid(True, which='major', axis='y', linestyle='--', linewidth=0.5)  # 设置网格线 - 只显示横向
+    plt.xticks(distances)
+    plt.ylim(40, 102)
+
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == '__main__':
     # plot_srnn_hyperparameter_effects_on_success_rate()
     # plot_srnn_navigation_success_rate_by_distance()
-    plot_navigation_success_rate_by_distance_on_different_models()
+    plot_navigation_success_rate_by_noise_on_different_models()

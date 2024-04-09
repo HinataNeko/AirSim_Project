@@ -436,7 +436,7 @@ if __name__ == '__main__':
                     action = td3.actor.random_sample_action()
 
                 # 与环境进行交互
-                next_state, reward, done = env_wrapper.step(action)
+                next_state, reward, done, successful = env_wrapper.step(action)
 
                 # 异常episode
                 if j < 15 and done:
