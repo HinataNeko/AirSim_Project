@@ -24,11 +24,11 @@ GAMMA = 0.99  # reward discount
 TAU = 0.005  # soft replacement
 
 MEMORY_CAPACITY = 1000000  # size of replay buffer
-BATCH_SIZE = 512  # update batch_size
+BATCH_SIZE = 256  # update batch_size
 
-MAX_EPISODES = 199  # total number of episodes for training
+MAX_EPISODES = 1000  # total number of episodes for training
 MAX_EP_STEPS = 400  # total number of steps for each episode
-EXPLORE_EPISODES = 0  # for random action sampling in the beginning of training
+EXPLORE_EPISODES = 20  # for random action sampling in the beginning of training
 UPDATE_ITR = 2  # repeated updates for each step
 POLICY_UPDATE_FREQ = 4  # 策略网络更新频率
 
@@ -432,6 +432,8 @@ if __name__ == '__main__':
 
         n = 0
         reward_per_ep = []  # 用于记录每个EP的reward，统计变化
+        distance_reward_per_ep = []  # 用于记录每个EP的reward，统计变化
+        detection_reward_per_ep = []  # 用于记录每个EP的reward，统计变化
         while n < MAX_EPISODES:
             t1 = time.time()
             step = 0
@@ -477,6 +479,8 @@ if __name__ == '__main__':
 
             n += 1
             reward_per_ep.append(env_wrapper.episode_reward)
+            distance_reward_per_ep.append(env_wrapper.episode_distance_reward)
+            detection_reward_per_ep.append(env_wrapper.episode_detection_reward)
             print('\rEpisode: {}/{} | '
                   'Episode Reward: {:.4f} | '
                   'Distance Reward: {:.4f} | '
@@ -497,12 +501,43 @@ if __name__ == '__main__':
                 td3.save_weights()
                 td3.save_memory()
 
-        np.save(f"./saved_model/{NAME}_reward_history.npy", np.array(reward_per_ep))
-        plt.plot(reward_per_ep)
-        plt.show()
-
+        np.savez(f"./saved_model/{NAME}_reward_history.npz",
+                 total_reward=np.array(reward_per_ep),
+                 distance_reward=np.array(distance_reward_per_ep),
+                 detection_reward=np.array(detection_reward_per_ep))
         td3.save_weights()
         td3.save_memory()
+
+        # 绘图
+        plt.figure(figsize=(18, 6))
+        episodes = list(range(1, len(reward_per_ep) + 1))
+
+        # 绘制总奖励曲线
+        plt.subplot(1, 3, 1)
+        plt.plot(episodes, reward_per_ep, 'b-', label='Total Reward')  # 使用蓝色实线
+        plt.title('Total Reward per Episode')
+        plt.xlabel('Episode')
+        plt.ylabel('Reward')
+        plt.grid(True)
+
+        # 绘制距离奖励曲线
+        plt.subplot(1, 3, 2)
+        plt.plot(episodes, distance_reward_per_ep, 'g-', label='Distance Reward')  # 使用绿色虚线
+        plt.title('Distance Reward per Episode')
+        plt.xlabel('Episode')
+        plt.ylabel('Distance Reward')
+        plt.grid(True)
+
+        # 绘制视野位置奖励曲线
+        plt.subplot(1, 3, 3)
+        plt.plot(episodes, detection_reward_per_ep, 'r-', label='Field of View Reward')  # 使用红色点划线
+        plt.title('Field of View Reward per Episode')
+        plt.xlabel('Episode')
+        plt.ylabel('FOV Reward')
+        plt.grid(True)
+
+        plt.tight_layout()  # 自动调整子图参数
+        plt.show()
 
     elif MODE == 'test':  # test
         td3.q_net1.eval()

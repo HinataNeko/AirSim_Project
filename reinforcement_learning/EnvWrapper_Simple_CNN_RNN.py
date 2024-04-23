@@ -247,16 +247,15 @@ class DroneEnvWrapper:
         self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(15, 0., 0.),
                                              orientation_val=airsim.Quaternionr(0., 0., 0., 1.))
         self.client.simSetObjectPose("target", self.target_start_pose)
-        max_target_position_offset = 0.05
-        # max_target_position_offset = random.uniform(0, 0.05)
+        # max_target_position_offset = 0.05
+        max_target_position_offset = random.uniform(0, 0.05)
         self.target_pose_random_offset = airsim.Vector3r(
             random.uniform(-max_target_position_offset, max_target_position_offset),
             random.uniform(-max_target_position_offset, max_target_position_offset),
             random.uniform(-max_target_position_offset, max_target_position_offset))
 
         # 设置随机风
-        max_wind_speed = 10
-        wind_speed = random.uniform(0, max_wind_speed)  # 风速
+        wind_speed = random.uniform(0, 10)  # 风速
         # wind_speed = 0
         wind_angle = random.uniform(0, 2 * math.pi)  # 风向
         wind_x = wind_speed * math.cos(wind_angle)  # x轴风速

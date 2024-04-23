@@ -125,8 +125,8 @@ def plot_navigation_success_rate_by_noise_on_different_models():
         plt.plot(distances, rates, marker=marker, linestyle='-', linewidth=2, color=color, label=model)
 
     plt.title('Navigation Success Rate by Noise Var across Different Models', fontsize=14)
-    plt.xlabel('Initial Distance (m)', fontsize=12)
-    plt.ylabel('Noise Var', fontsize=12)
+    plt.xlabel('Input Noise Variance', fontsize=12)
+    plt.ylabel('Success Rate (%)', fontsize=12)
     plt.legend(title='Models', fontsize=10)
     plt.grid(True, which='major', axis='y', linestyle='--', linewidth=0.5)  # 设置网格线 - 只显示横向
     plt.xticks(distances)

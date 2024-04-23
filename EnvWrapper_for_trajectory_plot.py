@@ -3,18 +3,21 @@ import cv2
 import numpy as np
 import random
 import airsim
+import math
 
 from snn.cnn_srnn_model import Model
 
 
 class DroneEnvWrapper:
-    def __init__(self, render=True):
+    def __init__(self, render=True, image_noise=False):
         self.camera_width = 320
         self.camera_height = 240
         self.speed = 2.
         self.time_step = 0.05
+        self.image_noise_var = 0.3
 
         self.render = render
+        self.image_noise = image_noise
         self.is_connected = False  # 可用于控制线程运行的标志
         self.is_flying = False  # 是否正在飞行
 
@@ -48,6 +51,13 @@ class DroneEnvWrapper:
             img_png = np.frombuffer(client.simGetImage("0", airsim.ImageType.Scene), dtype=np.uint8)
             try:
                 img_bgr = cv2.imdecode(img_png, cv2.IMREAD_COLOR)
+
+                # 生成高斯噪声
+                if self.image_noise:
+                    noise = np.random.normal(0, self.image_noise_var, img_bgr.shape).astype(np.float32)
+                    img_bgr_normal = (img_bgr.astype(np.float32) / 255.) * 2 - 1  # (-1, 1)
+                    noisy_image = np.clip(img_bgr_normal + noise, -1.0, 1.0)
+                    img_bgr = ((noisy_image + 1.) / 2. * 255.).astype(np.uint8)
                 # img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
                 x, y, w, h = self.target_xywh
@@ -153,6 +163,13 @@ class DroneEnvWrapper:
             done = True
             print("Collided!")
 
+        # 生成高斯噪声
+        if self.image_noise:
+            noise = np.random.normal(0, self.image_noise_var, state.shape).astype(np.float32)
+            state_normal = (state.astype(np.float32) / 255.) * 2 - 1  # (-1, 1)
+            noisy_image = np.clip(state_normal + noise, -1.0, 1.0)
+            state = ((noisy_image + 1.) / 2. * 255.).astype(np.uint8)
+
         return state, self.position.to_numpy_array(), done, successful
 
     def reset(self):
@@ -196,17 +213,17 @@ class DroneEnvWrapper:
         #     random.uniform(-max_position_offset_z, max_position_offset_z)))
         random_position = airsim.Pose(airsim.Vector3r(  # 左上方
             random.uniform(0, 0),
-            random.uniform(10, 10),
-            random.uniform(8, 8)))
+            random.uniform(8, 8),
+            random.uniform(6, 6)))
         # random_position = airsim.Pose(airsim.Vector3r(  # 右下方
         #     random.uniform(0, 0),
         #     random.uniform(-10, -10),
         #     random.uniform(-8, -8)))
         self.client.simSetVehiclePose(random_position, ignore_collision=True)
 
-        # target起始点
+        # 设置目标距离与随机移动
         # target_pose = self.client.simGetObjectPose("target")
-        self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(20., 0., 0.),
+        self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(15., 0., 0.),
                                              orientation_val=airsim.Quaternionr(0., 0., 0., 1.))
         self.client.simSetObjectPose("target", self.target_start_pose)
         max_target_position_offset = 0.0
@@ -214,6 +231,16 @@ class DroneEnvWrapper:
             random.uniform(-max_target_position_offset, max_target_position_offset),
             random.uniform(-max_target_position_offset, max_target_position_offset),
             random.uniform(-max_target_position_offset, max_target_position_offset))
+
+        # 设置随机风
+        # max_wind_speed = 10
+        # wind_speed = random.uniform(0, max_wind_speed)  # 风速
+        wind_speed = 0
+        wind_angle = random.uniform(0, 2 * math.pi)  # 风向
+        wind_x = wind_speed * math.cos(wind_angle)  # x轴风速
+        wind_y = wind_speed * math.sin(wind_angle)  # y轴风速
+        wind = airsim.Vector3r(wind_x, wind_y, 0)  # z轴风速设置为0
+        self.client.simSetWind(wind)
 
         self.episode_reward = 0.
         self.episode_distance_reward = 0.
@@ -232,6 +259,13 @@ class DroneEnvWrapper:
         img_bgr = cv2.imdecode(img_png, cv2.IMREAD_COLOR)
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
         state = img_rgb
+
+        # 生成高斯噪声
+        if self.image_noise:
+            noise = np.random.normal(0, self.image_noise_var, state.shape).astype(np.float32)
+            state_normal = (state.astype(np.float32) / 255.) * 2 - 1  # (-1, 1)
+            noisy_image = np.clip(state_normal + noise, -1.0, 1.0)
+            state = ((noisy_image + 1.) / 2. * 255.).astype(np.uint8)
 
         return state, self.position.to_numpy_array()
 

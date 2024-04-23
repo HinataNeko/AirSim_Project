@@ -27,7 +27,7 @@ TAU = 0.005  # soft replacement
 MEMORY_CAPACITY = 1000000  # size of replay buffer
 BATCH_SIZE = 256  # update batch_size
 
-MAX_EPISODES = 500  # total number of episodes for training
+MAX_EPISODES = 1000  # total number of episodes for training
 MAX_EP_STEPS = 400  # total number of steps for each episode
 EXPLORE_EPISODES = 0  # for random action sampling in the beginning of training
 UPDATE_ITR = 2  # repeated updates for each step
@@ -235,7 +235,7 @@ class QNetwork(nn.Module):
         self.action_dim = action_dim
         self.hidden_dim = hidden_dim
         self.rnn_layers = 2
-        self.T = 4
+        self.T = 8
 
         self.srnn = SpikingRNN(input_size=self.state_dim, hidden_size=self.hidden_dim)
 
@@ -273,7 +273,7 @@ class ActorNetwork(nn.Module):
         self.action_dim = action_dim
         self.hidden_dim = hidden_dim
         self.rnn_layers = 2
-        self.T = 4
+        self.T = 8
 
         self.srnn = SpikingRNN(input_size=self.state_dim, hidden_size=self.hidden_dim)
 
