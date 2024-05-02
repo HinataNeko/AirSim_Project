@@ -139,7 +139,7 @@ class Ui_Form(object):
         self.wind_speed_spinBox.setFont(font)
         self.wind_speed_spinBox.setPrefix("")
         self.wind_speed_spinBox.setDecimals(1)
-        self.wind_speed_spinBox.setMaximum(15.0)
+        self.wind_speed_spinBox.setMaximum(20.0)
         self.wind_speed_spinBox.setSingleStep(0.5)
         self.wind_speed_spinBox.setProperty("value", 5.0)
         self.wind_speed_spinBox.setObjectName("wind_speed_spinBox")

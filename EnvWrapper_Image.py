@@ -27,10 +27,10 @@ class DroneEnvWrapper:
         self.camera_height = 240
         self.speed = 2.
         self.time_step = 0.05
+        self.image_noise = image_noise
         self.image_noise_var = 0.0
 
         self.render = render
-        self.image_noise = image_noise
         self.is_connected = False  # 可用于控制线程运行的标志
         self.is_flying = False  # 是否正在飞行
 
@@ -134,18 +134,13 @@ class DroneEnvWrapper:
     def step(self, action):
         # 距离奖励
         def get_distance_reward():
-            distance_reward = (old_distance - self.distance) * 0.1 / self.time_step
-            if distance_reward < 0:
-                distance_reward *= 2
-            distance_reward += self.target_xywh[2] * self.target_xywh[3]
+            distance_reward = (old_distance - self.distance) * 0.2 / self.time_step
             return distance_reward
 
         def get_detection_reward():
-            detection_reward = 0.5 - abs(self.target_xywh[0] - 0.5) - abs(self.target_xywh[1] - 0.5)  # (-0.5, 0.5)
-            detection_reward *= 0.4
-            # print(detection_reward)
-
-            return detection_reward
+            detection_reward = - abs(self.target_xywh[0] - 0.5) - abs(self.target_xywh[1] - 0.5)  # (-1, 0)
+            detection_reward += 0.05
+            return 0 if detection_reward > 0 else detection_reward
 
         # action: np.ndarray, 顺序(roll, pitch, thrust, yaw)
         roll, pitch, thrust, yaw = action.tolist()
@@ -183,37 +178,37 @@ class DroneEnvWrapper:
         if len(detection) > 0:
             self.target_xywh = self.get_target_xywh(detection[0])
 
-            # 距离奖励
             distance_reward = get_distance_reward()
             detection_reward = get_detection_reward()
-            reward += distance_reward + detection_reward
-
-            self.episode_distance_reward += distance_reward
-            self.episode_detection_reward += detection_reward
 
             # 结束
             if self.distance < 3.5:
-                if detection_reward > 0:
-                    final_reward += 100. * 5 * detection_reward
-                # reward += 100.
+                final_reward += 50. * (detection_reward + 1)
                 done = True
                 successful = True
                 print("Completed!")
+
+            reward += distance_reward + detection_reward
+            self.episode_distance_reward += distance_reward
+            self.episode_detection_reward += detection_reward
         else:  # 目标在视野外
-            final_reward += -50. if self.distance > 10 else -25.
+            final_reward += -50. if self.distance > 8 else -25.
             done = True
             print("The target moved out of the camera's field of view")
 
         is_collided = self.client.simGetCollisionInfo().has_collided
         if is_collided:
-            final_reward -= 1.
+            if self.distance < 3.5:  # 与目标发生碰撞
+                final_reward -= 10
+                print("Collided with target!")
+            else:
+                final_reward -= 25
+                print("Collided with other objects!")
             done = True
-            print("Collided!")
 
-        # print(f"distance_reward: {distance_reward}\tdetection_reward: {detection_reward}\treward: {reward}")
         reward += final_reward
-        self.episode_reward += reward
         self.episode_final_reward += final_reward
+        self.episode_reward += reward
 
         # 生成高斯噪声
         if self.image_noise:
@@ -222,7 +217,7 @@ class DroneEnvWrapper:
             noisy_image = np.clip(state_normal + noise, -1.0, 1.0)
             state = ((noisy_image + 1.) / 2. * 255.).astype(np.uint8)
 
-        return state, reward, done, successful
+        return state, reward, done, successful, self.position
 
     def reset(self):
         self.client.simPause(False)
@@ -270,23 +265,35 @@ class DroneEnvWrapper:
         self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(15., 0., 0.),
                                              orientation_val=airsim.Quaternionr(0., 0., 0., 1.))
         self.client.simSetObjectPose("target", self.target_start_pose)
-        max_target_position_offset = 0.0
-        # max_target_position_offset = random.uniform(0, 0.05)
-        self.target_pose_random_offset = airsim.Vector3r(
-            random.uniform(-max_target_position_offset, max_target_position_offset),
-            random.uniform(-max_target_position_offset, max_target_position_offset),
-            random.uniform(-max_target_position_offset, max_target_position_offset))
+
+        def random_unit_vector(c=1.):
+            # 随机生成方位角θ
+            theta = random.uniform(0, 2 * math.pi)
+            # 随机生成余弦值，并求得极角φ
+            cos_phi = random.uniform(-1, 1)
+            sin_phi = math.sqrt(1 - cos_phi ** 2)  # 计算sin(φ)
+
+            # 计算三维坐标
+            x = sin_phi * math.cos(theta)
+            y = sin_phi * math.sin(theta)
+            z = cos_phi
+
+            return x * c, y * c, z * c
+
+        target_position_offset = 0.0
+        # target_position_offset = random.uniform(0, 0.05)
+        self.target_pose_random_offset = airsim.Vector3r(*random_unit_vector(target_position_offset))
 
         # 设置随机风
-        # max_wind_speed = 10
-        # wind_speed = random.uniform(0, max_wind_speed)  # 风速
-        wind_speed = 0
+        wind_speed = 17.5
+        # wind_speed = random.uniform(0, 10)  # 风速
         wind_angle = random.uniform(0, 2 * math.pi)  # 风向
         wind_x = wind_speed * math.cos(wind_angle)  # x轴风速
         wind_y = wind_speed * math.sin(wind_angle)  # y轴风速
         wind = airsim.Vector3r(wind_x, wind_y, 0)  # z轴风速设置为0
         self.client.simSetWind(wind)
 
+        # 重置初始奖励
         self.episode_reward = 0.
         self.episode_distance_reward = 0.
         self.episode_detection_reward = 0.
@@ -312,7 +319,7 @@ class DroneEnvWrapper:
             noisy_image = np.clip(state_normal + noise, -1.0, 1.0)
             state = ((noisy_image + 1.) / 2. * 255.).astype(np.uint8)
 
-        return state
+        return state, self.position
 
     def close(self):
         if not self.is_connected:

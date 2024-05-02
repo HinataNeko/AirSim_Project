@@ -4,7 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 
-def smooth(data, sm=5):
+def smooth(data, sm=1):
     z = np.ones(len(data))
     y = np.ones(sm) * 1.0
     d = np.convolve(y, data, "same") / np.convolve(y, z, "same")
@@ -52,6 +52,25 @@ def load_reward_history(file_path):
     distance_reward = smooth(data['distance_reward'])
     detection_reward = smooth(data['detection_reward'])
     return total_reward, distance_reward, detection_reward
+
+
+def plot_reward(result, title="Reward per Episode"):
+    """
+    result: 一维的ndarray。
+    """
+
+    plt.figure(figsize=(8, 6))
+    episodes = list(range(1, len(result) + 1))
+
+    plt.plot(episodes, result, 'b-', label='Total Reward')  # 使用蓝色实线
+    plt.title(title, fontsize=14)
+    plt.xlabel('Episode', fontsize=12)
+    plt.ylabel('Reward', fontsize=12)
+    plt.tick_params(labelsize=12)
+    plt.grid(True)
+
+    plt.tight_layout()  # 自动调整子图参数
+    plt.show()
 
 
 def plot_rewards_with_multi_seeds(results):
@@ -119,6 +138,9 @@ if __name__ == '__main__':
         total_reward_list.append(total_reward)
         distance_reward_list.append(distance_reward)
         detection_reward_list.append(detection_reward)
-    plot_rewards_with_shade(total_reward_list)
-    plot_rewards_with_shade(distance_reward_list)
-    plot_rewards_with_shade(detection_reward_list)
+
+    plot_reward(total_reward_list[0], title="Total Reward per Episode")
+    plot_reward(distance_reward_list[0], title="Distance Reward per Episode")
+    # plot_rewards_with_shade(total_reward_list)
+    # plot_rewards_with_shade(distance_reward_list)
+    # plot_rewards_with_shade(detection_reward_list)

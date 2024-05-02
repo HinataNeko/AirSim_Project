@@ -8,10 +8,10 @@ import sys
 import os
 
 from load_dataset import CustomDataset
-from evaluation.cnn_rnn_model import Model
+# from evaluation.cnn_rnn_model import Model
 # from evaluation.cnn_lstm_model import Model
 # from evaluation.cnn_gru_model import Model
-# from snn.cnn_srnn_model import Model
+from snn.cnn_srnn_model import Model
 from EnvWrapper_for_trajectory_plot import DroneEnvWrapper
 
 
@@ -221,13 +221,13 @@ def play_record_as_video(image_array, salient_map_array, start_frame=0):
 
 
 if __name__ == '__main__':
-    env_wrapper = DroneEnvWrapper(render=True, image_noise=True)
+    env_wrapper = DroneEnvWrapper(render=True, image_noise=False)
     model = Model(load_dataset=False)
     model.load()
     model.register_hook()
 
-    name = 'gru'
-    mode = 'noise_0.3'
+    name = 'srnn'
+    mode = 'no_noise'
     save_path = './evaluation/results/noise_analysis'
     record_path = os.path.join(save_path, f'{name}_{mode}.npz')
 

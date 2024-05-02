@@ -12,7 +12,7 @@ import numpy as np
 from EnvWrapper_Simple_CNN_RNN import DroneEnvWrapper
 
 NAME = 'TD3_Simple_CNN_CfC'
-MODE = 'train'
+MODE = 'test'
 
 state_dim = 128
 state_keep_n = 3
@@ -437,7 +437,7 @@ if __name__ == '__main__':
         while n < MAX_EPISODES:
             t1 = time.time()
             step = 0
-            state = env_wrapper.reset()  # 初始化
+            state, start_position = env_wrapper.reset()  # 初始化
             if state is None:
                 continue
 
@@ -450,7 +450,7 @@ if __name__ == '__main__':
                     action = td3.actor.random_sample_action()
 
                 # 与环境进行交互
-                next_state, reward, done, successful = env_wrapper.step(action)
+                next_state, reward, done, successful, position = env_wrapper.step(action)
 
                 # 异常episode
                 if j < 15 and done:
@@ -549,28 +549,31 @@ if __name__ == '__main__':
 
         n_test = 100
         n_successful = 0
+        successful_speeds = []
         n = 0
 
         while n < n_test:
             t1 = time.time()
             step = 0
-            state = env_wrapper.reset()
+            state, start_position = env_wrapper.reset()
             if state is None:
                 continue
 
             for _ in range(2 * MAX_EP_STEPS):
                 action = td3.actor.get_action(state, explore_noise_scale=0)
-                next_state, reward, done, successful = env_wrapper.step(action)
+                next_state, reward, done, successful, position = env_wrapper.step(action)
 
                 state = next_state
                 step += 1
                 if done:
                     if successful:
                         n_successful += 1
+                        speed = (position - start_position).get_length() / (env_wrapper.time_step * step) * 2 / 3
+                        successful_speeds.append(speed)
+                        print(f"Successful! Speed: {speed} m/s")
                     break
 
             # 异常episode
-
             if step < 15:
                 continue
 
@@ -589,4 +592,5 @@ if __name__ == '__main__':
                           env_wrapper.episode_final_reward,
                           step, time.time() - t1))
 
-        print(f"Successful rate: {n_successful}/{n_test}={n_successful / n_test}")
+        print(f"Successful rate: {n_successful}/{n_test} = {n_successful / n_test}")
+        print(f"Average speed: {sum(successful_speeds) / len(successful_speeds)} m/s")

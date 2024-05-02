@@ -12,12 +12,15 @@ from cnn_ncps_model import Model
 
 
 class DroneEnvWrapper:
-    def __init__(self, render=True):
+    def __init__(self, render=True, image_noise=False):
         self.camera_width = 320
         self.camera_height = 240
         self.state_keep_n = 3
         self.speed = 2.
         self.time_step = 0.05
+
+        self.image_noise = image_noise
+        self.image_noise_var = 0.0
 
         self.render = render
         self.is_connected = False  # 可用于控制线程运行的标志
@@ -134,6 +137,7 @@ class DroneEnvWrapper:
             vx=pitch * self.speed, vy=roll * self.speed, vz=-thrust * self.speed, duration=self.time_step,
             yaw_mode=airsim.YawMode(is_rate=True, yaw_or_rate=yaw * 30.)).join()
         self.client.simSetObjectPose("target", airsim.Pose(self.target_position + self.target_pose_random_offset))
+        self.client.simPause(True)
 
         # 更新agent和target位置
         self.target_pose = self.client.simGetObjectPose("target")
@@ -145,8 +149,6 @@ class DroneEnvWrapper:
         detection = self.client.simGetDetections("0", airsim.ImageType.Scene)
         if len(detection) == 0:
             detection = self.client.simGetDetections("0", airsim.ImageType.Scene)
-
-        self.client.simPause(True)
 
         reward = -0.1
         final_reward = 0.
@@ -192,6 +194,11 @@ class DroneEnvWrapper:
         img_png = np.frombuffer(self.client.simGetImage("0", airsim.ImageType.Scene), dtype=np.uint8)
         img_bgr = cv2.imdecode(img_png, cv2.IMREAD_COLOR)
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+        if self.image_noise:  # 生成高斯噪声
+            noise = np.random.normal(0, self.image_noise_var, img_rgb.shape).astype(np.float32)
+            img_rgb_normal = (img_rgb.astype(np.float32) / 255.) * 2 - 1  # (-1, 1)
+            noisy_image = np.clip(img_rgb_normal + noise, -1.0, 1.0)
+            img_rgb = ((noisy_image + 1.) / 2. * 255.).astype(np.uint8)
         img_float = (img_rgb.astype(np.float32) / 255.).transpose((2, 0, 1))
         with torch.no_grad():
             hidden_state = self.cnn_model(torch.tensor(img_float).unsqueeze(0).to(self.device))[0].cpu().numpy()
@@ -199,7 +206,7 @@ class DroneEnvWrapper:
         self.state_stack.append(hidden_state)
         state = np.array(self.state_stack)
 
-        return state, reward, done, successful
+        return state, reward, done, successful, self.position
 
     def reset(self):
         self.client.simPause(False)
@@ -247,16 +254,28 @@ class DroneEnvWrapper:
         self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(15, 0., 0.),
                                              orientation_val=airsim.Quaternionr(0., 0., 0., 1.))
         self.client.simSetObjectPose("target", self.target_start_pose)
-        # max_target_position_offset = 0.05
-        max_target_position_offset = random.uniform(0, 0.05)
-        self.target_pose_random_offset = airsim.Vector3r(
-            random.uniform(-max_target_position_offset, max_target_position_offset),
-            random.uniform(-max_target_position_offset, max_target_position_offset),
-            random.uniform(-max_target_position_offset, max_target_position_offset))
+
+        def random_unit_vector(c=1.):
+            # 随机生成方位角θ
+            theta = random.uniform(0, 2 * math.pi)
+            # 随机生成余弦值，并求得极角φ
+            cos_phi = random.uniform(-1, 1)
+            sin_phi = math.sqrt(1 - cos_phi ** 2)  # 计算sin(φ)
+
+            # 计算三维坐标
+            x = sin_phi * math.cos(theta)
+            y = sin_phi * math.sin(theta)
+            z = cos_phi
+
+            return x * c, y * c, z * c
+
+        target_position_offset = 0.0
+        # target_position_offset = random.uniform(0, 0.05)
+        self.target_pose_random_offset = airsim.Vector3r(*random_unit_vector(target_position_offset))
 
         # 设置随机风
-        wind_speed = random.uniform(0, 10)  # 风速
-        # wind_speed = 0
+        wind_speed = 17.5
+        # wind_speed = random.uniform(0, 10)  # 风速
         wind_angle = random.uniform(0, 2 * math.pi)  # 风向
         wind_x = wind_speed * math.cos(wind_angle)  # x轴风速
         wind_y = wind_speed * math.sin(wind_angle)  # y轴风速
@@ -268,7 +287,7 @@ class DroneEnvWrapper:
         self.episode_distance_reward = 0.
         self.episode_detection_reward = 0.
         self.episode_final_reward = 0.
-        self.stay_in_range_count = 0
+        # self.stay_in_range_count = 0
 
         # 重置初始位置
         self.target_pose = self.client.simGetObjectPose("target")
@@ -276,6 +295,8 @@ class DroneEnvWrapper:
         self.target_orientation = self.target_pose.orientation
         self.position = self.client.simGetVehiclePose().position
         self.distance = (self.position - self.target_position).get_length()
+
+        self.client.simPause(True)
 
         # 检测目标是否在视野内
         detection = self.client.simGetDetections("0", airsim.ImageType.Scene)
@@ -286,6 +307,11 @@ class DroneEnvWrapper:
             img_png = np.frombuffer(self.client.simGetImage("0", airsim.ImageType.Scene), dtype=np.uint8)
             img_bgr = cv2.imdecode(img_png, cv2.IMREAD_COLOR)
             img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+            if self.image_noise:  # 生成高斯噪声
+                noise = np.random.normal(0, self.image_noise_var, img_rgb.shape).astype(np.float32)
+                img_rgb_normal = (img_rgb.astype(np.float32) / 255.) * 2 - 1  # (-1, 1)
+                noisy_image = np.clip(img_rgb_normal + noise, -1.0, 1.0)
+                img_rgb = ((noisy_image + 1.) / 2. * 255.).astype(np.uint8)
             img_float = (img_rgb.astype(np.float32) / 255.).transpose((2, 0, 1))
             with torch.no_grad():
                 hidden_state = self.cnn_model(torch.tensor(img_float).unsqueeze(0).to(self.device))[0].cpu().numpy()
@@ -295,8 +321,7 @@ class DroneEnvWrapper:
             state = None
             print("Reset Error")
 
-        self.client.simPause(True)
-        return state
+        return state, self.position
 
     def close(self):
         if not self.is_connected:

@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from spikingjelly import visualizing
 from spikingjelly.activation_based import neuron, encoding, functional, surrogate, layer, monitor
 
 import time
@@ -29,7 +28,7 @@ BATCH_SIZE = 256  # update batch_size
 
 MAX_EPISODES = 1000  # total number of episodes for training
 MAX_EP_STEPS = 400  # total number of steps for each episode
-EXPLORE_EPISODES = 0  # for random action sampling in the beginning of training
+EXPLORE_EPISODES = 20  # for random action sampling in the beginning of training
 UPDATE_ITR = 2  # repeated updates for each step
 POLICY_UPDATE_FREQ = 4  # 策略网络更新频率
 
@@ -487,10 +486,12 @@ if __name__ == '__main__':
 
         n = 0
         reward_per_ep = []  # 用于记录每个EP的reward，统计变化
+        distance_reward_per_ep = []  # 用于记录每个EP的reward，统计变化
+        detection_reward_per_ep = []  # 用于记录每个EP的reward，统计变化
         while n < MAX_EPISODES:
             t1 = time.time()
             step = 0
-            state = env_wrapper.reset()  # 初始化
+            state, start_position = env_wrapper.reset()  # 初始化
             if state is None:
                 continue
 
@@ -503,7 +504,7 @@ if __name__ == '__main__':
                     action = td3.actor.random_sample_action()
 
                 # 与环境进行交互
-                next_state, reward, done, successful = env_wrapper.step(action)
+                next_state, reward, done, successful, position = env_wrapper.step(action)
 
                 # 异常episode
                 if j < 15 and done:
@@ -532,6 +533,8 @@ if __name__ == '__main__':
 
             n += 1
             reward_per_ep.append(env_wrapper.episode_reward)
+            distance_reward_per_ep.append(env_wrapper.episode_distance_reward)
+            detection_reward_per_ep.append(env_wrapper.episode_detection_reward)
             print('\rEpisode: {}/{} | '
                   'Episode Reward: {:.4f} | '
                   'Distance Reward: {:.4f} | '
@@ -552,12 +555,43 @@ if __name__ == '__main__':
                 td3.save_weights()
                 td3.save_memory()
 
-        np.save(f"./saved_model/{NAME}_reward_history.npy", np.array(reward_per_ep))
-        plt.plot(reward_per_ep)
-        plt.show()
-
+        np.savez(f"./saved_model/{NAME}_reward_history.npz",
+                 total_reward=np.array(reward_per_ep),
+                 distance_reward=np.array(distance_reward_per_ep),
+                 detection_reward=np.array(detection_reward_per_ep))
         td3.save_weights()
         td3.save_memory()
+
+        # 绘图
+        plt.figure(figsize=(18, 6))
+        episodes = list(range(1, len(reward_per_ep) + 1))
+
+        # 绘制总奖励曲线
+        plt.subplot(1, 3, 1)
+        plt.plot(episodes, reward_per_ep, 'b-', label='Total Reward')  # 使用蓝色实线
+        plt.title('Total Reward per Episode')
+        plt.xlabel('Episode')
+        plt.ylabel('Reward')
+        plt.grid(True)
+
+        # 绘制距离奖励曲线
+        plt.subplot(1, 3, 2)
+        plt.plot(episodes, distance_reward_per_ep, 'g-', label='Distance Reward')  # 使用绿色虚线
+        plt.title('Distance Reward per Episode')
+        plt.xlabel('Episode')
+        plt.ylabel('Distance Reward')
+        plt.grid(True)
+
+        # 绘制视野位置奖励曲线
+        plt.subplot(1, 3, 3)
+        plt.plot(episodes, detection_reward_per_ep, 'r-', label='Field of View Reward')  # 使用红色点划线
+        plt.title('Field of View Reward per Episode')
+        plt.xlabel('Episode')
+        plt.ylabel('FOV Reward')
+        plt.grid(True)
+
+        plt.tight_layout()  # 自动调整子图参数
+        plt.show()
 
     elif MODE == 'test':  # test
         td3.q_net1.eval()
@@ -569,28 +603,31 @@ if __name__ == '__main__':
 
         n_test = 100
         n_successful = 0
+        successful_speeds = []
         n = 0
 
         while n < n_test:
             t1 = time.time()
             step = 0
-            state = env_wrapper.reset()
+            state, start_position = env_wrapper.reset()
             if state is None:
                 continue
 
             for _ in range(2 * MAX_EP_STEPS):
                 action = td3.actor.get_action(state, explore_noise_scale=0)
-                next_state, reward, done, successful = env_wrapper.step(action)
+                next_state, reward, done, successful, position = env_wrapper.step(action)
 
                 state = next_state
                 step += 1
                 if done:
                     if successful:
                         n_successful += 1
+                        speed = (position - start_position).get_length() / (env_wrapper.time_step * step) * 2 / 3
+                        successful_speeds.append(speed)
+                        print(f"Successful! Speed: {speed} m/s")
                     break
 
             # 异常episode
-
             if step < 15:
                 continue
 
@@ -609,4 +646,5 @@ if __name__ == '__main__':
                           env_wrapper.episode_final_reward,
                           step, time.time() - t1))
 
-        print(f"Successful rate: {n_successful}/{n_test}={n_successful / n_test}")
+        print(f"Successful rate: {n_successful}/{n_test} = {n_successful / n_test}")
+        print(f"Average speed: {sum(successful_speeds) / len(successful_speeds)} m/s")

@@ -14,7 +14,7 @@ class DroneEnvWrapper:
         self.camera_height = 240
         self.speed = 2.
         self.time_step = 0.05
-        self.image_noise_var = 0.3
+        self.image_noise_var = 0.
 
         self.render = render
         self.image_noise = image_noise
@@ -226,16 +226,28 @@ class DroneEnvWrapper:
         self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(15., 0., 0.),
                                              orientation_val=airsim.Quaternionr(0., 0., 0., 1.))
         self.client.simSetObjectPose("target", self.target_start_pose)
-        max_target_position_offset = 0.0
-        self.target_pose_random_offset = airsim.Vector3r(
-            random.uniform(-max_target_position_offset, max_target_position_offset),
-            random.uniform(-max_target_position_offset, max_target_position_offset),
-            random.uniform(-max_target_position_offset, max_target_position_offset))
+
+        def random_unit_vector(c=1.):
+            # 随机生成方位角θ
+            theta = random.uniform(0, 2 * math.pi)
+            # 随机生成余弦值，并求得极角φ
+            cos_phi = random.uniform(-1, 1)
+            sin_phi = math.sqrt(1 - cos_phi ** 2)  # 计算sin(φ)
+
+            # 计算三维坐标
+            x = sin_phi * math.cos(theta)
+            y = sin_phi * math.sin(theta)
+            z = cos_phi
+
+            return x * c, y * c, z * c
+
+        target_position_offset = 0.05
+        # target_position_offset = random.uniform(0, 0.05)
+        self.target_pose_random_offset = airsim.Vector3r(*random_unit_vector(target_position_offset))
 
         # 设置随机风
-        # max_wind_speed = 10
-        # wind_speed = random.uniform(0, max_wind_speed)  # 风速
         wind_speed = 0
+        # wind_speed = random.uniform(0, 10)  # 风速
         wind_angle = random.uniform(0, 2 * math.pi)  # 风向
         wind_x = wind_speed * math.cos(wind_angle)  # x轴风速
         wind_y = wind_speed * math.sin(wind_angle)  # y轴风速

@@ -266,7 +266,7 @@ def show_neuron_layer2_activity():
     labels = ['roll', 'pitch', 'throttle', 'yaw']  # 定义y轴的标签
 
     # images_index = [0, 112, 1127, 2204, 2352, 3492, 4574]
-    images_index = [3492, 4574, 2352, 180]
+    images_index = [180, 3492, 4574, 2352]
     grid_size = (len(images_index), 11)
     colors = [['red', 'blue', 'red', 'blue'],
               ['red', 'blue', 'blue', 'red'],
@@ -304,9 +304,9 @@ def show_neuron_layer2_activity():
         ax0.set_xlim(-0.5, T - 0.5)
         ax0.set_xticks(range(T))  # 设置横轴刻度位置
         # ax0.set_xticklabels(range(T))  # 设置横轴刻度标签
-        ax0.text(1.04, -0.12, 't', va='center', ha='center', transform=ax0.transAxes,
+        ax0.text(1.04, -0.1, 't', va='center', ha='center', transform=ax0.transAxes,
                  fontsize=font_size)  # 设置横轴标题位置为横轴的右侧
-        ax0.text(-0.05, 1.05, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
+        ax0.text(-0.05, 1.08, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
         if v_threshold:
             ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
         if i == 0:
@@ -317,9 +317,9 @@ def show_neuron_layer2_activity():
         ax0.plot(t, all_T_v2[:, images_index[i], 2], color=colors[i][1])
         ax0.set_xlim(-0.5, T - 0.5)
         ax0.set_xticks(range(T))  # 设置横轴刻度位置
-        ax0.text(1.04, -0.12, 't', va='center', ha='center', transform=ax0.transAxes,
+        ax0.text(1.04, -0.1, 't', va='center', ha='center', transform=ax0.transAxes,
                  fontsize=font_size)  # 设置横轴标题位置为横轴的右侧
-        ax0.text(-0.05, 1.05, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
+        ax0.text(-0.05, 1.08, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
         if v_threshold:
             ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
         if i == 0:
@@ -330,9 +330,9 @@ def show_neuron_layer2_activity():
         ax0.plot(t, all_T_v2[:, images_index[i], 15], color=colors[i][2])
         ax0.set_xlim(-0.5, T - 0.5)
         ax0.set_xticks(range(T))  # 设置横轴刻度位置
-        ax0.text(1.04, -0.12, 't', va='center', ha='center', transform=ax0.transAxes,
+        ax0.text(1.04, -0.1, 't', va='center', ha='center', transform=ax0.transAxes,
                  fontsize=font_size)  # 设置横轴标题位置为横轴的右侧
-        ax0.text(-0.05, 1.05, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
+        ax0.text(-0.05, 1.08, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
         if v_threshold:
             ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
         if i == 0:
@@ -343,9 +343,9 @@ def show_neuron_layer2_activity():
         ax0.plot(t, all_T_v2[:, images_index[i], 74], color=colors[i][3])
         ax0.set_xlim(-0.5, T - 0.5)
         ax0.set_xticks(range(T))  # 设置横轴刻度位置
-        ax0.text(1.04, -0.12, 't', va='center', ha='center', transform=ax0.transAxes,
+        ax0.text(1.04, -0.1, 't', va='center', ha='center', transform=ax0.transAxes,
                  fontsize=font_size)  # 设置横轴标题位置为横轴的右侧
-        ax0.text(-0.05, 1.05, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
+        ax0.text(-0.05, 1.08, 'v', va='center', ha='center', transform=ax0.transAxes, fontsize=font_size)
         if v_threshold:
             ax0.axhline(v_threshold, label='$V_{threshold}$', linestyle='-.', c='r')
         if i == 0:
