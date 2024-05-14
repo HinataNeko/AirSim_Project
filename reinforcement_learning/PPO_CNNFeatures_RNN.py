@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 import os
+import sys
 import time
 
 from EnvWrapper_Simple_CNN_RNN import DroneEnvWrapper
@@ -37,6 +38,7 @@ K_EPOCHS = 512  # update policy for K epochs in one PPO update
 
 EPS_CLIP = 0.2  # clip parameter for PPO
 GAMMA = 0.99  # discount factor
+LAMBDA = 0.95
 
 LR_ACTOR = 0.0003  # learning rate for actor network
 LR_CRITIC = 0.001  # learning rate for critic network
@@ -66,8 +68,10 @@ class Buffer:
         actions = torch.tensor(np.stack(self.transition_dict['actions']), dtype=torch.float32).to(device)
         action_logprobs = torch.tensor(self.transition_dict['action_logprobs'], dtype=torch.float32).to(device)
         next_states = torch.tensor(np.stack(self.transition_dict['next_states']), dtype=torch.float32).to(device)
-        rewards = self.transition_dict['rewards']
-        dones = self.transition_dict['dones']
+        # rewards = self.transition_dict['rewards']
+        # dones = self.transition_dict['dones']
+        rewards = torch.tensor(self.transition_dict['rewards'], dtype=torch.float32).to(device)
+        dones = torch.tensor(self.transition_dict['dones'], dtype=torch.float32).to(device)  # 布尔值转换为浮点数
         return states, actions, action_logprobs, next_states, rewards, dones
 
     def clear(self):
@@ -104,17 +108,6 @@ class Actor(nn.Module):
     def set_action_std(self, new_action_std):
         self.action_var = torch.full((self.action_dim,), new_action_std ** 2).to(device)
 
-    def act(self, state):
-        action_mean = self.forward(state)
-        cov_mat = torch.diag(self.action_var).unsqueeze(dim=0)  # 针对不带batch_size的tensor
-        dist = MultivariateNormal(action_mean, cov_mat)
-
-        action = dist.sample()
-        action_logprob = dist.log_prob(action)
-        state_val = self.critic(state)
-
-        return action.detach(), action_logprob.detach(), state_val.detach()
-
     def select_action(self, state):  # state: without batch_size
         with torch.no_grad():
             state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
@@ -127,7 +120,14 @@ class Actor(nn.Module):
 
         return action.detach().cpu().numpy(), action_logprob.detach().item()
 
-    def evaluate(self, state, action):
+    def select_deterministic_action(self, state):  # state: without batch_size
+        with torch.no_grad():
+            state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
+            action_mean = self.forward(state).squeeze(0)
+
+        return action_mean.detach().cpu().numpy()
+
+    def evaluate(self, state, action):  # with batch_size
         action_mean = self.forward(state)
         action_var = self.action_var.expand_as(action_mean)
         cov_mat = torch.diag_embed(action_var).to(device)  # 针对带有batch_size的tensor
@@ -136,7 +136,7 @@ class Actor(nn.Module):
         action_logprobs = dist.log_prob(action)
         dist_entropy = dist.entropy()
 
-        return action_logprobs, dist_entropy
+        return action_logprobs, dist_entropy  # tensor format
 
 
 class Critic(nn.Module):
@@ -207,6 +207,7 @@ class PPO:
     def update(self):
         old_states, old_actions, old_logprobs, next_states, rewards, dones = self.buffer.collect()
 
+        """
         # Monte Carlo estimate of returns
         discounted_rewards = [0] * len(rewards)  # Pre-allocate space for efficiency
         R = 0  # Initialize the post-state return
@@ -214,7 +215,6 @@ class PPO:
             R = rewards[i] + GAMMA * R * (1 - dones[i])  # Reset R at the end of each episode
             discounted_rewards[i] = R
 
-        # Normalizing the rewards
         rewards = torch.tensor(discounted_rewards, dtype=torch.float32).to(device)
         # rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-7)
 
@@ -223,6 +223,22 @@ class PPO:
 
         # calculate advantages
         advantages = rewards - old_state_values
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-7)
+        """
+
+        # 评估当前状态和下一个状态的价值
+        with torch.no_grad():
+            next_q_target = self.critic(next_states).squeeze(-1).detach()
+            td_target = rewards + GAMMA * next_q_target * (1 - dones)  # 实际值
+            td_value = self.critic(old_states).squeeze(-1).detach()  # 估计值
+            td_delta = td_target - td_value  # 计算TD误差
+
+        # GAE计算
+        advantages = torch.zeros_like(td_delta)
+        advantage = 0
+        for i in reversed(range(len(td_delta))):
+            advantage = GAMMA * LAMBDA * advantage + td_delta[i]
+            advantages[i] = advantage
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-7)
 
         # Optimize policy for K epochs
@@ -240,7 +256,7 @@ class PPO:
 
             # calculate loss
             actor_loss = torch.mean(-torch.min(surr1, surr2) - 0.01 * dist_entropy)
-            critic_loss = 0.5 * self.mseLoss(state_values, rewards)
+            critic_loss = 0.5 * self.mseLoss(state_values, td_target)
 
             self.actor_optimizer.zero_grad()
             self.critic_optimizer.zero_grad()
@@ -248,9 +264,6 @@ class PPO:
             critic_loss.backward()
             self.actor_optimizer.step()
             self.critic_optimizer.step()
-
-        # Copy new weights into old policy
-        # self.actor_old.load_state_dict(self.actor.state_dict())
 
         # clear buffer
         self.buffer.clear()
@@ -269,22 +282,6 @@ class PPO:
 
 ################################### Training ###################################
 def train():
-    """Initialization"""
-    env_wrapper = DroneEnvWrapper(render=True)
-    ppo = PPO(state_dim_h=STATE_DIM_H,
-              state_keep_n=STATE_KEEP_N,
-              action_dim=ACTION_DIM)
-
-    """Checkpoint"""
-    save_directory = "./saved_model/PPO_saving"
-    if not os.path.exists(save_directory):
-        os.makedirs(save_directory)
-
-    model_save_path = os.path.join(save_directory, f'{NAME}_model.pth')
-    if os.path.exists(model_save_path):
-        ppo.load(model_save_path)
-        print(f'Previous model loaded: {model_save_path}')
-
     # track total training time
     start_time = datetime.now().replace(microsecond=0)
     print("Started training at (GMT) : ", start_time)
@@ -369,6 +366,89 @@ def train():
     print("Total training time  : ", end_time - start_time)
     print("============================================================================================")
 
+    np.savez(os.path.join(save_directory, f'{NAME}_reward_history.npz'),
+             total_reward=np.array(reward_per_ep),
+             distance_reward=np.array(distance_reward_per_ep),
+             detection_reward=np.array(detection_reward_per_ep))
+
+    # 绘图
+    plt.figure(figsize=(18, 6))
+    episodes = list(range(1, len(reward_per_ep) + 1))
+
+    # 绘制总奖励曲线
+    plt.subplot(1, 3, 1)
+    plt.plot(episodes, reward_per_ep, 'b-', label='Total Reward')  # 使用蓝色实线
+    plt.title('Total Reward per Episode')
+    plt.xlabel('Episode')
+    plt.ylabel('Reward')
+    plt.grid(True)
+
+    # 绘制距离奖励曲线
+    plt.subplot(1, 3, 2)
+    plt.plot(episodes, distance_reward_per_ep, 'g-', label='Distance Reward')  # 使用绿色虚线
+    plt.title('Distance Reward per Episode')
+    plt.xlabel('Episode')
+    plt.ylabel('Distance Reward')
+    plt.grid(True)
+
+    # 绘制视野位置奖励曲线
+    plt.subplot(1, 3, 3)
+    plt.plot(episodes, detection_reward_per_ep, 'r-', label='Field of View Reward')  # 使用红色点划线
+    plt.title('Field of View Reward per Episode')
+    plt.xlabel('Episode')
+    plt.ylabel('FOV Reward')
+    plt.grid(True)
+
+    plt.tight_layout()  # 自动调整子图参数
+    plt.show()
+
+
+def test():
+    print("Testing model...")
+    total_test_episodes = 100  # Define the number of episodes for testing
+    total_rewards = []  # Store rewards for each episode
+
+    for episode in range(total_test_episodes):
+        state, _ = env_wrapper.reset()
+        episode_reward = 0
+
+        for _ in range(MAX_EP_LEN):
+            action, _ = ppo.actor.select_action(state)  # Get action from the policy network
+            state, reward, done, _, _ = env_wrapper.step(action)  # Take action in the environment
+            episode_reward += reward  # Accumulate rewards
+            if done:
+                break
+
+        total_rewards.append(episode_reward)
+        print(f'Episode: {episode + 1}, Reward: {episode_reward}')
+
+    average_reward = sum(total_rewards) / len(total_rewards)
+    print(f'Average Reward: {average_reward}')
+
 
 if __name__ == '__main__':
-    train()
+    """Initialization"""
+    env_wrapper = DroneEnvWrapper(render=True)
+    ppo = PPO(state_dim_h=STATE_DIM_H,
+              state_keep_n=STATE_KEEP_N,
+              action_dim=ACTION_DIM)
+
+    """Checkpoint"""
+    save_directory = "./saved_model/PPO_saving"
+    if not os.path.exists(save_directory):
+        os.makedirs(save_directory)
+
+    model_save_path = os.path.join(save_directory, f'{NAME}_model.pth')
+    if os.path.exists(model_save_path):
+        ppo.load(model_save_path)
+        print(f'Previous model loaded: {model_save_path}')
+    else:
+        if MODE == 'test':
+            print("No saved model found for testing. Please check the path or train the model first.")
+            sys.exit()
+
+    """"Train or test"""
+    if MODE == 'train':
+        train()
+    elif MODE == 'test':
+        test()

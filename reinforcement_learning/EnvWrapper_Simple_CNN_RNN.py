@@ -250,7 +250,6 @@ class DroneEnvWrapper:
         self.client.simSetVehiclePose(random_position, ignore_collision=True)
 
         # 设置目标距离与随机移动
-        # self.target_pose = self.client.simGetObjectPose("target")
         self.target_start_pose = airsim.Pose(position_val=airsim.Vector3r(15, 0., 0.),
                                              orientation_val=airsim.Quaternionr(0., 0., 0., 1.))
         self.client.simSetObjectPose("target", self.target_start_pose)
@@ -269,13 +268,13 @@ class DroneEnvWrapper:
 
             return x * c, y * c, z * c
 
-        target_position_offset = 0.0
-        # target_position_offset = random.uniform(0, 0.05)
+        # target_position_offset = 0.0
+        target_position_offset = random.uniform(0, 0.05)
         self.target_pose_random_offset = airsim.Vector3r(*random_unit_vector(target_position_offset))
 
         # 设置随机风
-        wind_speed = 17.5
-        # wind_speed = random.uniform(0, 10)  # 风速
+        # wind_speed = 10
+        wind_speed = random.uniform(0, 10)  # 风速
         wind_angle = random.uniform(0, 2 * math.pi)  # 风向
         wind_x = wind_speed * math.cos(wind_angle)  # x轴风速
         wind_y = wind_speed * math.sin(wind_angle)  # y轴风速
@@ -319,7 +318,6 @@ class DroneEnvWrapper:
             state = np.array(self.state_stack)
         else:
             state = None
-            print("Reset Error")
 
         return state, self.position
 

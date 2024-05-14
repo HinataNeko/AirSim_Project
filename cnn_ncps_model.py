@@ -154,7 +154,7 @@ class Model:
 
     def save(self):
         torch.save(self.checkpoint, self.model_save_path)
-        print("模型已保存到：" + self.model_save_path)
+        print("Model saved to：" + self.model_save_path)
 
     def load(self, path=None):
         if path is None:
@@ -163,7 +163,7 @@ class Model:
             model_data = torch.load(path)
             self.model.load_state_dict(model_data['model_state_dict'])  # 模型数据
             self.optimizer.load_state_dict(model_data['optimizer_state_dict'])  # 优化器数据
-            print("已载入之前训练的模型数据：" + path)
+            print("Previous model loaded：" + path)
 
     def predict(self, rgb_img, transform=True, start_sequence=True):
         if transform:

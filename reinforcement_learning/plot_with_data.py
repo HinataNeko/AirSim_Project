@@ -4,7 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 
-def smooth(data, sm=1):
+def smooth(data, sm=5):
     z = np.ones(len(data))
     y = np.ones(sm) * 1.0
     d = np.convolve(y, data, "same") / np.convolve(y, z, "same")
@@ -97,7 +97,7 @@ def plot_rewards_with_multi_seeds(results):
 
     # 设置图例、标题和坐标轴标签
     plt.legend(title='Random Seed')
-    plt.title('TD3 Training Performance for Multiple Seeds', fontsize=16)
+    plt.title('TD3 Training Performance for Multiple Seeds', fontsize=14)
     plt.xlabel('Episode', fontsize=14)
     plt.ylabel('Reward', fontsize=14)
 
@@ -105,7 +105,7 @@ def plot_rewards_with_multi_seeds(results):
     plt.show()
 
 
-def plot_rewards_with_shade(results):
+def plot_rewards_with_shade(results, title=''):
     """
     results (list of np.ndarray): 每个元素是一个含有特定随机种子训练结果的 ndarray。
     """
@@ -118,13 +118,16 @@ def plot_rewards_with_shade(results):
     })
 
     plt.figure(figsize=(8, 6))
-    sns.set(style="whitegrid")  # 设置 Seaborn 的背景和网格样式为白色网格
+    fontsize = 14
+    # sns.set(style="whitegrid")  # 设置 Seaborn 的背景和网格样式为白色网格
 
-    # 绘制带有置信区间的线性回归模型
+    # 绘制带有置信区间的奖励曲线
     sns.lineplot(data=df, x='Episode', y='Reward', errorbar=('ci', 95), color='blue', lw=2)
-    plt.title('TD3 Training Performance Over Episodes', fontsize=16)
-    plt.xlabel('Episode', fontsize=14)
-    plt.ylabel('Reward', fontsize=14)
+    plt.title(title, fontsize=fontsize)
+    plt.xlabel('Episode', fontsize=fontsize)
+    plt.ylabel('Reward', fontsize=fontsize)
+    plt.tick_params(axis='both', labelsize=fontsize)
+    plt.grid(False)
 
     plt.tight_layout()
     plt.show()
@@ -132,15 +135,15 @@ def plot_rewards_with_shade(results):
 
 if __name__ == '__main__':
     total_reward_list, distance_reward_list, detection_reward_list = [], [], []
-    for i in range(1, 9):
+    for i in range(1, 10):
         total_reward, distance_reward, detection_reward = load_reward_history(
             f"./saved_model/backup/TD3_Simple_CNN_CfC_reward_history({i}).npz")
         total_reward_list.append(total_reward)
         distance_reward_list.append(distance_reward)
         detection_reward_list.append(detection_reward)
 
-    plot_reward(total_reward_list[0], title="Total Reward per Episode")
-    plot_reward(distance_reward_list[0], title="Distance Reward per Episode")
-    # plot_rewards_with_shade(total_reward_list)
-    # plot_rewards_with_shade(distance_reward_list)
+    # plot_reward(total_reward_list[0], title="Total Reward per Episode")
+    # plot_reward(distance_reward_list[0], title="Distance Reward per Episode")
+    plot_rewards_with_shade(total_reward_list, title='Total Reward per Episode')
+    plot_rewards_with_shade(distance_reward_list, title='Distance Reward per Episode')
     # plot_rewards_with_shade(detection_reward_list)

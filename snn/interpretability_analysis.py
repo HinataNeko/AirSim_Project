@@ -253,9 +253,6 @@ def plot_trajectory_with_spike_rate_heatmap_3d(ax, trajectory_coords, neuron_spi
     # 创建颜色映射
     color_map = mpl.colormaps.get_cmap(cmap)
 
-    # fig = plt.figure(figsize=(6, 6))
-    # ax = fig.add_subplot(111, projection='3d')
-
     trajectory_coords = trajectory_coords - trajectory_coords[0, :]  # 将轨迹平移到坐标原点
     for i in range(T - 1):
         # 计算当前和下一个时间步的坐标
@@ -272,10 +269,6 @@ def plot_trajectory_with_spike_rate_heatmap_3d(ax, trajectory_coords, neuron_spi
     # 添加颜色条
     sm = mpl.cm.ScalarMappable(cmap=cmap, norm=mpl.colors.Normalize(vmin=0, vmax=1))
     sm.set_array([])
-    # cbar = fig.colorbar(sm, ax=ax, fraction=0.04, pad=0.1, aspect=15)  # 调整颜色条的大小和间距
-    # cbar.set_label('Spike Rate')
-
-    # ax.set_title('3D Drone Flight Trajectory with Neuron Spike Rate Heatmap', fontsize=12, pad=8)
 
     # 在起点和终点处绘制特殊标记
     ax.scatter(*trajectory_coords[0, :], color='green', s=90, marker='o', label='Start')
@@ -285,9 +278,15 @@ def plot_trajectory_with_spike_rate_heatmap_3d(ax, trajectory_coords, neuron_spi
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
 
-    ax.set_xlim((0, 20))
+    ax.set_xlim((0, 15))
     ax.set_ylim((-10, 10))
     ax.set_zlim((-10, 10))
+
+    # 设置x, y, z轴的刻度间隔
+    # ax.set_xticks(np.arange(0, 21, 5))  # 从0到20，间隔为5
+    # ax.set_yticks(np.arange(-10, 11, 5))  # 从-10到10，间隔为5
+    # ax.set_zticks(np.arange(-10, 11, 5))  # 从-10到10，间隔为5
+
     ax.invert_yaxis()  # 翻转Y轴
     ax.legend()
     ax.tick_params(axis='both', which='major', labelsize=10)

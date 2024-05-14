@@ -1,5 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import time
+import os
+
+from TD3_Simple_CNN_RNN import TD3
+from EnvWrapper_Simple_CNN_RNN_Target_Following import DroneEnvWrapper
 
 
 def generate_circular_trajectory(r, T, start_position='right', clockwise=False):
@@ -116,16 +121,91 @@ def visualize_trajectory(increments):
     ax.set_xlabel('X Position')
     ax.set_ylabel('Y Position')
     ax.set_zlabel('Z Position')
-    ax.set_title('3D Circular Trajectory Visualization')
+    ax.set_title('3D Trajectory Visualization')
 
     ax.legend()
     plt.show()
 
 
+def plot_trajectories_3d(ax, agent_trajectory, target_trajectory):
+    """
+    在3D空间中绘制无人机与目标的运动轨迹。
+    - agent_trajectory: 无人机飞行轨迹坐标的数组，形状为(T, 3)。
+    - target_trajectory: 目标运动轨迹坐标的数组，形状为(T, 3)。
+    """
+    # Translate the trajectory to start at the origin
+    # origin = target_trajectory[0, :] + np.array([10, -10, 0])  # square
+    origin = target_trajectory[0, :] + np.array([0, -10, 0])  # circle
+    agent_trajectory = agent_trajectory - origin
+    target_trajectory = target_trajectory - origin
+
+    # Extract x, y, z coordinates for plotting
+    agent_x, agent_y, agent_z = agent_trajectory[:, 0], agent_trajectory[:, 1], agent_trajectory[:, 2]
+    target_x, target_y, target_z = target_trajectory[:, 0], target_trajectory[:, 1], target_trajectory[:, 2]
+
+    # Plot the 3D trajectory
+    ax.plot(agent_x, agent_y, agent_z, color='blue', linewidth=2, linestyle='-', label='Agent Trajectory')
+    ax.plot(target_x, target_y, target_z, color='darkorange', linewidth=2, linestyle='-', label='Target Trajectory')
+
+    # 起点与终点特殊标记
+    ax.scatter(*agent_trajectory[0], color='deepskyblue', s=150, marker='o', label='Start')
+    ax.scatter(*agent_trajectory[-1], color='green', s=150, marker='*', label='End')
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    ax.set_xlim((-12, 12))
+    ax.set_ylim((-12, 12))
+    ax.set_zlim((-5, 5))
+    # ax.set_xticks(np.arange(0, 16, 5))
+    # ax.set_yticks(np.arange(-8, 9, 4))
+    # ax.set_zticks(np.arange(-6, 7, 3))
+    ax.invert_yaxis()  # 翻转Y轴
+    ax.legend()
+    ax.tick_params(axis='both', which='major', labelsize=10)
+
+
 if __name__ == '__main__':
-    r = 5  # radius of the circle
-    T = 1000  # total number of time steps
-    start_position = 'top'  # start from the top of the circle
-    clockwise = True  # move in a clockwise direction
-    trajectory_increments = generate_circular_trajectory(r, T, start_position, clockwise)
-    visualize_trajectory(trajectory_increments)
+    r = 10  # radius of the circle
+    T = 1600  # total number of time steps
+    # trajectory_increments = generate_square_trajectory(r, T, 'bottom_right', clockwise=False)
+    trajectory_increments = generate_circular_trajectory(r, T, 'right', clockwise=False)
+    trajectory_increments[:, [0, 1]] = trajectory_increments[:, [1, 0]]  # 交换x和y坐标
+    # visualize_trajectory(trajectory_increments)
+
+    """==============================Target following=============================="""
+    env_wrapper = DroneEnvWrapper(trajectory_increments, render=True)
+    td3 = TD3(state_dim=128, action_dim=4)
+    td3.load_weights()
+    td3.actor.eval()
+
+    agent_position_list = []
+    target_position_list = []
+
+    state, agent_position, target_position = env_wrapper.reset()
+    agent_position_list.append(agent_position)
+    target_position_list.append(target_position)
+
+    for t in range(T):
+        action = td3.actor.get_action(state, explore_noise_scale=0)
+        next_state, reward, done, agent_position, target_position = env_wrapper.step(action, t)
+
+        agent_position_list.append(agent_position)
+        target_position_list.append(target_position)
+
+        state = next_state
+
+    print("Done!")
+
+    agent_position_array = np.array(agent_position_list)
+    agent_position_array[:, -1] = -agent_position_array[:, -1]  # 反转z轴
+    target_position_array = np.array(target_position_list)
+    target_position_array[:, -1] = -target_position_array[:, -1]  # 反转z轴
+
+    # Create a 3D plot
+    fig = plt.figure(figsize=(8, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    plot_trajectories_3d(ax, agent_position_array, target_position_array)
+    plt.tight_layout()
+    plt.show()
